@@ -1,5 +1,6 @@
 import collections
 from typing import Dict
+from DataGenerater import *
 import gc
 import HCClusterTree
 import torch
@@ -27,33 +28,37 @@ import multiprocessing
 from DataScientist import pca_deduce
 
 
-def train(global_model_state_dict, dataset_dict, worker_id, device, args):
+def train(global_model_state_dict, datasetLoader, worker_id, device, args):
     model = Model.init_model(args.model_name)
     model.load_state_dict(global_model_state_dict)
-    optimizer = optim.SGD(model.parameters(), lr=args.lr)
-
-    train_loader= init_local_dataloader(dataset_dict, args)
+    optimizer = optim.Adam(model.parameters(), lr=args.lr)
     model.train()
-
     model.to(device)
-
+    data_size = 0
+    avg_loss = 0
+    count = 0
     for local_epoch in range(args.local_epochs):
-        for batch_index, (batch_data, batch_label) in enumerate(train_loader):
+        for batch_index, (batch_data, batch_label) in enumerate(datasetLoader):
             optimizer.zero_grad()
+            if local_epoch == 0:
+                data_size += len(batch_data)
             batch_data = batch_data.to(device)
             batch_label = batch_label.to(device)
 
             pred = model(batch_data)
-
+            # print(pred)
             loss = F.nll_loss(pred, batch_label)
+
+            avg_loss += loss.item()
+            count +=1
 
             loss.backward()
 
             optimizer.step()
 
     model.to('cpu')
-
-    data_len = sum(dataset_dict['data_len'].values())
+    # print(avg_loss/count)
+    data_len = data_size
     cost = 0
     cost += sum([param.nelement() for param in model.parameters()])
 
@@ -63,22 +68,6 @@ def train(global_model_state_dict, dataset_dict, worker_id, device, args):
             'data_len': data_len,
             'id': worker_id,
             'cost': cost * 4}
-
-
-def init_local_dataloader(dataset_dict, args):
-
-    train_dataset = TensorDataset(dataset_dict['data'],
-                                  dataset_dict['label'].to(torch.long))
-
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
-    #
-    # test_dataset = TensorDataset(dataset_dict['data_test'],
-    #                              dataset_dict['label_test'].to(torch.long))
-    #
-    # test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
-
-    return train_loader
-
 
 def test(model, dataset_loader, device):
     model.eval()
@@ -111,48 +100,9 @@ def avg(model_dict, local_model_dicts):
     return model_dict
 
 
-def pca_dim_deduction(high_dim_data, max_dim):
-    pca = PCA(n_components=max_dim, whiten=True)
-    return pca.fit_transform(high_dim_data)
-
-
-def draw_dynamic(clients_dict, clients_clusters):
-    fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
-    # ax = fig.add_subplot()
-    plt.title("10-Class Data Distribution")
-
-    markers = []
-    colors = []
-
-    while True:
-        data_ = [[] for i in range(len(clients_dict))]
-
-        if len(data_) > 0:
-            keys = []
-            values = []
-            for key, value in clients_dict.items():
-                keys.append(key)
-                values.append(value[0].tolist())
-            print(" values : ")
-
-            new_value = pca_dim_deduction(np.array(values), 3)
-
-            for i, id in enumerate(keys):
-                data_[id] = new_value[i]
-            print("clients_clusters : ")
-            print(clients_clusters)
-            point_style_list = ['lightcoral', 'darkkhaki', 'green', 'lightblue', 'mistyrose']
-            for id, workers_id in enumerate(clients_clusters):
-                for worker_id in workers_id:
-                    ax.scatter(data_[worker_id][0], data_[worker_id][1], data_[worker_id][2], c=point_style_list[id], marker="^")
-        plt.draw()
-        plt.pause(1)
-        ax.clear()
-
-
 def main(args):
-    train_workers_dataset, test_clusters_dataset = Data.load_data(args)
+    datasetGen = DatasetGen(args)
+    # DataSet = Data.generate_rotated_data(args)
 
     train_workers = [i for i in range(args.worker_num)]
 
@@ -192,10 +142,11 @@ def main(args):
 
         for worker_id in cluster_clients_train:
             # print(epoch, "  worker : ", worker_id)
-
+            FirstSelected = False
             if clients_model.get(worker_id) is None:
                 clients_model[worker_id] = ClientInServerData(worker_id, global_model.state_dict(), worker_id, epoch)
                 train_model_dict = global_model.state_dict()
+                FirstSelected = True
 
             else:
                 train_model_dict = ClusterManager.get_cluster_by_id(clients_model[worker_id].InClusterID).get_avg_cluster_model_copy()
@@ -203,29 +154,36 @@ def main(args):
 
             pre_clients_model[worker_id] = copy.deepcopy(train_model_dict)
             train_eval= train(train_model_dict
-                                          ,train_workers_dataset[worker_id]
+                                          ,datasetGen.get_client_DataLoader(worker_id)
                                           ,worker_id
                                           ,device
                                           ,args)
 
             FedAvg_train_eval= train(copy.deepcopy(FedAvg_global_model.state_dict())
-                                          , train_workers_dataset[worker_id]
+                                          , datasetGen.get_client_DataLoader(worker_id)
                                           , worker_id
                                           , device
                                           , args)
             FedAvg_local_models.append(FedAvg_train_eval)
 
-
             # print( loss,"   " ,acc)
             # epoch_loss.append(loss)
             # epoch_acc.append(acc)
             clients_model[worker_id].set_client_info(train_eval['model_dict'], train_eval['data_len'])
-
+            if FirstSelected:
+                clients_model[worker_id].PreModelStaticDict = copy.deepcopy(train_eval['model_dict'])
 
         # 计算相似性矩阵
         similarity_matrix = update_client_similarity_matrix(clients_model, pre_clients_model)
 
         ClusterManager.reset_similarity_matrix(similarity_matrix)
+        std_m = []
+        td_sm = copy.deepcopy(similarity_matrix)
+        for key, value in td_sm.items():
+            value.pop(key)
+            std_m.extend(value.values())
+        std = np.mean(std_m)
+        print('mean: ', std)
 
         ClusterManager.HCClusterDivide()
 
@@ -238,8 +196,7 @@ def main(args):
 
         ## 集群准确性测试
         for cluster_id, Cluster in ClusterManager.CurrentClusters.items():
-            test_dataset = test_clusters_dataset[cluster_id % 5]
-            test_dataloader = init_local_dataloader(test_dataset, args)
+            test_dataloader = datasetGen.get_cluster_test_DataLoader(cluster_id % args.cluster_number)
             test_model = Model.init_model(args.model_name)
             test_model.load_state_dict(Cluster.AvgClusterModelDict)
             loss, acc = test(test_model, test_dataloader, device)
@@ -248,8 +205,8 @@ def main(args):
 
         ## FedAvg聚合
         FedAvg_global_model.load_state_dict(avg(FedAvg_global_model.state_dict(), FedAvg_local_models))
-
-        loss, acc = test(FedAvg_global_model, global_model_test_data, device)
+        FedAvgTestDataLoader = datasetGen.get_fedavg_test_DataLoader()
+        loss, acc = test(FedAvg_global_model, FedAvgTestDataLoader, device)
         FedAvg_Loss.append(loss)
         FedAvg_Acc.append(acc)
         TotalLoss.append(np.mean(epoch_loss))
@@ -257,7 +214,8 @@ def main(args):
         print("Epoch: {}\t, FedAvg\t: Acc : {}\t, Loss : {}\t".format(epoch, FedAvg_Acc[epoch], FedAvg_Loss[epoch]))
         print("Epoch: {}\t, HCCFL\t: Acc : {}\t, Loss : {}\t".format(epoch, TotalAcc[epoch], TotalLoss[epoch]))
 
-    SavePath = args.save_path + 'round_100_WithOutTimeAvg_HCCFL_FedAvg_Loss_Acc_0'
+
+    SavePath = args.save_path + 'NewData_round_100_WithOutTimeAvg_HCCFL_FedAvg_Loss_Acc_0'
     # torch.save(client_update_grad,
     #            SavePath + '.pt')
     torch.save(FedAvg_Loss,
@@ -273,40 +231,40 @@ def main(args):
 
 
 def L2_Distance(tensor1, tensor2):
-    # Value = 0
+    Value = 0
+    for i in range(tensor1.shape[0]):
+        Value += math.pow(tensor1[i].item() - tensor2[i].item(), 2)
+    return Value
+
+    # UpSum = 0
     # for i in range(tensor1.shape[0]):
-    #     Value += math.pow(tensor1[i].item() - tensor2[i].item(), 2)
-    # return Value
-
-    UpSum = 0
-    for i in range(tensor1.shape[0]):
-        UpSum += tensor1[i].item() * tensor2[i].item()
-    DownSum1 = 0
-    DownSum2 = 0
-    for i in range(tensor1.shape[0]):
-        DownSum1 += tensor1[i].item() * tensor1[i].item()
-    DownSum1 = DownSum1 ** 0.5
-    for i in range(tensor2.shape[0]):
-        DownSum2 += tensor2[i].item() * tensor2[i].item()
-    DownSum2 = DownSum2 ** 0.5
-
-    return abs(1 - UpSum / (DownSum1 * DownSum2))
+    #     UpSum += tensor1[i].item() * tensor2[i].item()
+    # DownSum1 = 0
+    # DownSum2 = 0
+    # for i in range(tensor1.shape[0]):
+    #     DownSum1 += tensor1[i].item() * tensor1[i].item()
+    # DownSum1 = DownSum1 ** 0.5
+    # for i in range(tensor2.shape[0]):
+    #     DownSum2 += tensor2[i].item() * tensor2[i].item()
+    # DownSum2 = DownSum2 ** 0.5
+    #
+    # return abs(1 - UpSum / (DownSum1 * DownSum2))
 
 
 def avg_deep_param(model_dict, pre_model_dict):
     AvgParam = torch.zeros(model_dict['fc4.weight'].shape[0])
     for i in range(model_dict['fc4.weight'].shape[1]):
         for j in range(model_dict['fc4.weight'].shape[0]):
-            AvgParam[j] = AvgParam[j] + model_dict['fc4.weight'][j][i]
+            AvgParam[j] = AvgParam[j] + (model_dict['fc4.weight'][j][i])
     return AvgParam / model_dict['fc4.weight'].shape[1]
 
 
 def update_client_similarity_matrix(clients_model: Dict[int, ClientInServerData], pre_clients_model):
     similarity_matrix = {client_id_l:{client_id_r: 0.0 for client_id_r in clients_model.keys()} for client_id_l in clients_model.keys()}
     for client_id_l, Client_l in clients_model.items():
-        client_l_avg_param = avg_deep_param(Client_l.ModelStaticDict, pre_clients_model[client_id_l])
+        client_l_avg_param = avg_deep_param(Client_l.PreModelStaticDict, pre_clients_model[client_id_l])
         for client_id_r, Client_r in clients_model.items():
-            client_r_avg_param = avg_deep_param(Client_r.ModelStaticDict, pre_clients_model[client_id_r])
+            client_r_avg_param = avg_deep_param(Client_r.PreModelStaticDict, pre_clients_model[client_id_r])
             similarity_matrix[client_id_l][client_id_r] = L2_Distance(client_l_avg_param, client_r_avg_param)
     return similarity_matrix
     #

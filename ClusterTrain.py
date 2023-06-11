@@ -38,11 +38,12 @@ def train(global_model_state_dict, dataset_dict, worker_id, local_loss_list, dev
     for local_epoch in range(args.local_epochs):
         for batch_index, (batch_data, batch_label) in enumerate(train_loader):
             optimizer.zero_grad()
+
             batch_data = batch_data.to(device)
             batch_label = batch_label.to(device)
 
             pred = model(batch_data)
-
+            print(pred)
             loss = F.nll_loss(pred, batch_label)
 
             loss.backward()

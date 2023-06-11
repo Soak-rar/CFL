@@ -111,7 +111,7 @@ class HCClusterManager:
                         MinClusterIDPair[0] = Cluster_ID
                         MinClusterIDPair[1] = OtherCluster_ID
 
-            if MinDisBetweenTwoClusters > 0.2:
+            if MinDisBetweenTwoClusters > 0.0001:
                 print('  迭代-----------')
                 for cluster_id, cluster in self.CurrentClusters.items():
                     print(cluster_id, "  , ", cluster.Clients)
@@ -177,6 +177,7 @@ class HCClusterManager:
             if clients_model[client_id].TrainRound > max_round:
                 train_clients.clear()
                 train_clients.append(client_id)
+                max_round = clients_model[client_id].TrainRound
             elif clients_model[client_id].TrainRound == max_round:
                 train_clients.append(client_id)
         return train_clients

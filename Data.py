@@ -11,8 +11,8 @@ import Args
 
 
 def generate(args, dataset_name='mnist'):
-    data_target, data_target_test = Data_Process(args, dataset_name)
-
+    data_target, data_target_test, lens = Data_Process(args, dataset_name)
+    print(data_target[0][0].shape)
     local_classes = int(args.local_data_classes * args.dataset_labels_number)
     class_index = 0
     for i in range(args.cluster_number):
@@ -70,9 +70,9 @@ def load_data(args: Args.Arguments):
     train_workers = []
     test_clusters = []
     for i in range(args.worker_num):
-        train_workers.append(torch.load('../' + args.save_path + '/train_worker_' + str(i) + '.pt'))
+        train_workers.append(torch.load('/0.4_0.4_mnist_cluster_self_data10_2/train_worker_0.pt'))
     for i in range(args.cluster_number):
-        test_clusters.append(torch.load('../' + args.save_path + '/cluster_test_' + str(i) + '.pt'))
+        test_clusters.append(torch.load('/' + args.save_path + '/cluster_test_' + str(i) + '.pt'))
     return train_workers, test_clusters
 
 
@@ -249,10 +249,12 @@ def Data_Process(args, dataset_name):
         ])
         dataset_len = len(dataset)
         classes_num = len(dataset.classes)
+        # print(dataset.data[0].shape)
         # 将数据集按类别重新整理，并做标准化操作
         data_target = [[] for key in range(classes_num)]
 
         for (data, target) in zip(dataset.data, dataset.targets):
+            print(trans(data.numpy()))
             data_target[target.item()].append(trans(data.numpy()).numpy())
 
         data_target_test = [[] for key in range(classes_num)]
@@ -286,9 +288,9 @@ def Data_Process(args, dataset_name):
 
 if __name__ == '__main__':
     args = Args.Arguments()
-    generate_rotated_data(args)
-    # if len(args.data_Dis) > 0:
+    # generate_rotated_data(args)
+    # if len(args.data_Dis) > 0
     #     generate_data_with_data_self(args)
     # else:
-    #     generate(args, args.dataset_name)
+    generate(args, args.dataset_name)
 
