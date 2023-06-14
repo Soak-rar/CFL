@@ -48,7 +48,13 @@ class DatasetGen:
         self.load_dataset()
         self.normalize_dataset()
         self.divide_clients_data_index()
-        self.get_client_DataLoader(27)
+        # self.get_client_DataLoader(27)
+        # self.print_img()
+
+    def print_img(self):
+        for i in range(4):
+            rot_imgs = torch.rot90(self.Data[0][0], k=int(i))
+            save_image(rot_imgs, "%d.png" % i, nrow=5, normalize=True)
 
 
     # 将全部集群的测试集合并为 FedAvg的测试集数据
@@ -247,8 +253,13 @@ class DatasetGen:
                         end_pos += label_size
 
         elif self.mArgs.data_info['divide_type'] == 'rot':
+            cluster_number = self.mArgs.cluster_number
+            assert cluster_number == len(self.mArgs.data_info['data_rot'])
+            client_number_pre_cluster = self.mArgs.worker_num // cluster_number
+            for cluster_id in range(cluster_number):
+                
+                pass
 
-            pass
         else:
             pass
 

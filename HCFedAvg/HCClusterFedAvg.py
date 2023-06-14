@@ -40,6 +40,7 @@ def train(global_model_state_dict, datasetLoader, worker_id, device, args):
     for local_epoch in range(args.local_epochs):
         for batch_index, (batch_data, batch_label) in enumerate(datasetLoader):
             optimizer.zero_grad()
+
             if local_epoch == 0:
                 data_size += len(batch_data)
             batch_data = batch_data.to(device)
@@ -176,6 +177,8 @@ def main(args):
         # 计算相似性矩阵
         similarity_matrix = update_client_similarity_matrix(clients_model, pre_clients_model)
 
+        global_si_ma = calculate_relative_similarity(clients_model, global_model)
+
         ClusterManager.reset_similarity_matrix(similarity_matrix)
         std_m = []
         td_sm = copy.deepcopy(similarity_matrix)
@@ -189,8 +192,8 @@ def main(args):
 
         # ClusterManager.print_divide_result()
 
-        # ClusterManager.UpdateClusterAvgModel(clients_model, cluster_clients_train)
-        ClusterManager.UpdateClusterAvgModelWithTime(clients_model, cluster_clients_train)
+        ClusterManager.UpdateClusterAvgModel(clients_model, cluster_clients_train)
+        # ClusterManager.UpdateClusterAvgModelWithTime(clients_model, cluster_clients_train)
         epoch_loss = []
         epoch_acc = []
 
@@ -230,28 +233,30 @@ def main(args):
                SavePath + '_HCCFL_Acc.pt')
 
 
-def L2_Distance(tensor1, tensor2):
-    Value = 0
-    for i in range(tensor1.shape[0]):
-        Value += math.pow(tensor1[i].item() - tensor2[i].item(), 2)
-    return Value
+def L2_Distance(tensor1, tensor2, Use_cos = False):
 
-    # UpSum = 0
-    # for i in range(tensor1.shape[0]):
-    #     UpSum += tensor1[i].item() * tensor2[i].item()
-    # DownSum1 = 0
-    # DownSum2 = 0
-    # for i in range(tensor1.shape[0]):
-    #     DownSum1 += tensor1[i].item() * tensor1[i].item()
-    # DownSum1 = DownSum1 ** 0.5
-    # for i in range(tensor2.shape[0]):
-    #     DownSum2 += tensor2[i].item() * tensor2[i].item()
-    # DownSum2 = DownSum2 ** 0.5
-    #
-    # return abs(1 - UpSum / (DownSum1 * DownSum2))
+    if Use_cos:
+        UpSum = 0
+        for i in range(tensor1.shape[0]):
+            UpSum += tensor1[i].item() * tensor2[i].item()
+        DownSum1 = 0
+        DownSum2 = 0
+        for i in range(tensor1.shape[0]):
+            DownSum1 += tensor1[i].item() * tensor1[i].item()
+        DownSum1 = DownSum1 ** 0.5
+        for i in range(tensor2.shape[0]):
+            DownSum2 += tensor2[i].item() * tensor2[i].item()
+        DownSum2 = DownSum2 ** 0.5
+
+        return abs(1 - UpSum / (DownSum1 * DownSum2))
+    else:
+        Value = 0
+        for i in range(tensor1.shape[0]):
+            Value += math.pow(tensor1[i].item() - tensor2[i].item(), 2)
+        return Value
 
 
-def avg_deep_param(model_dict, pre_model_dict):
+def avg_deep_param(model_dict):
     AvgParam = torch.zeros(model_dict['fc4.weight'].shape[0])
     for i in range(model_dict['fc4.weight'].shape[1]):
         for j in range(model_dict['fc4.weight'].shape[0]):
@@ -259,14 +264,34 @@ def avg_deep_param(model_dict, pre_model_dict):
     return AvgParam / model_dict['fc4.weight'].shape[1]
 
 
-def update_client_similarity_matrix(clients_model: Dict[int, ClientInServerData], pre_clients_model):
+def avg_deep_param_with_dir(model_dict, pre_model_dict):
+    AvgParam = torch.zeros(model_dict['fc4.weight'].shape[0])
+    for i in range(model_dict['fc4.weight'].shape[1]):
+        for j in range(model_dict['fc4.weight'].shape[0]):
+            AvgParam[j] = AvgParam[j] + (model_dict['fc4.weight'][j][i] - pre_model_dict['fc4.weight'][j][i])
+    return AvgParam / model_dict['fc4.weight'].shape[1]
+
+
+def update_client_similarity_matrix(clients_model: Dict[int, ClientInServerData], global_model):
     similarity_matrix = {client_id_l:{client_id_r: 0.0 for client_id_r in clients_model.keys()} for client_id_l in clients_model.keys()}
     for client_id_l, Client_l in clients_model.items():
-        client_l_avg_param = avg_deep_param(Client_l.PreModelStaticDict, pre_clients_model[client_id_l])
+        client_l_avg_param = avg_deep_param(Client_l.PreModelStaticDict)
         for client_id_r, Client_r in clients_model.items():
-            client_r_avg_param = avg_deep_param(Client_r.PreModelStaticDict, pre_clients_model[client_id_r])
+            client_r_avg_param = avg_deep_param(Client_r.PreModelStaticDict)
             similarity_matrix[client_id_l][client_id_r] = L2_Distance(client_l_avg_param, client_r_avg_param)
     return similarity_matrix
+
+
+def calculate_relative_similarity(clients_model, global_model):
+    similarity_matrix = {client_id_l: {client_id_r: 0.0 for client_id_r in clients_model.keys()} for client_id_l in
+                         clients_model.keys()}
+    for client_id_l, Client_l in clients_model.items():
+        client_l_avg_param = avg_deep_param_with_dir(Client_l.PreModelStaticDict, global_model.state_dict())
+        for client_id_r, Client_r in clients_model.items():
+            client_r_avg_param = avg_deep_param_with_dir(Client_r.PreModelStaticDict, global_model.state_dict())
+            similarity_matrix[client_id_l][client_id_r] = L2_Distance(client_l_avg_param, client_r_avg_param, True)
+    return similarity_matrix
+
     #
     # for client_id_l, clients in similarity_matrix.items():
     #     client_l_deep_avg_param = avg_deep_param(clients_model[client_id_l].ModelStaticDict)
