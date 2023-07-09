@@ -1,3 +1,5 @@
+import copy
+
 import torch
 import random
 
@@ -17,6 +19,7 @@ import torch.optim as optim
 import time
 import os
 import multiprocessing
+import HCFedAvg.DataGenerater
 
 from ClusterMain import pca_dim_deduction
 
@@ -25,18 +28,16 @@ from ClusterMain import pca_dim_deduction
 
 def train(model, train_loader):
 
-    optimizer = optim.SGD(model.parameters(), lr=0.2)
+    optimizer = optim.Adam(model.parameters(), lr=0.0005)
     model.train()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    before_model_weight = model.state_dict()['fc4.weight'][:]
-
     model.to(device)
-    sum = 0
+
     for batch_index, (batch_data, batch_label) in enumerate(train_loader):
         optimizer.zero_grad()
         batch_data = batch_data.to(device)
         batch_label = batch_label.to(device)
-        sum += len(batch_data)
+
         pred = model(batch_data)
 
         loss = F.nll_loss(pred, batch_label)
@@ -44,33 +45,35 @@ def train(model, train_loader):
         loss.backward()
 
         optimizer.step()
-    print(len(train_loader.dataset))
-    print(sum)
+
     # for name, param in model1.named_parameters():
         # print(param.grad)
     model.to('cpu')
+    return copy.deepcopy(model)
 
-    return model.fc4.weight.grad
 
-
-def test(model, dataset_loader):
-    model.eval()
+def test(model_, dataset_loader):
+    model_.eval()
     test_loss = 0
     correct = 0
+    count_loss = 0
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model = model.to(device)
+    model = model_.to(device)
     with torch.no_grad():
         for data, target in dataset_loader:
             data = data.to(device)
             target = target.to(device)
             output = model(data)
             test_loss += F.nll_loss(output, target, reduction='sum').item()
+            count_loss += 1
             pred = output.argmax(1, keepdim=True)
             correct += pred.eq(target.view_as(pred)).sum().item()
 
     test_len = len(dataset_loader.dataset)
     test_loss /= test_len
-    model.to('cpu')
+    model_.to('cpu')
+    model = None
+
     return test_loss, correct / test_len
 
 
@@ -98,41 +101,77 @@ def init_dataset_loader(dataset_name, batch_size):
         pass
 
 
+def avg(model_dict, local_model_dicts):
+    total_len = len(local_model_dicts)
+
+    for key in model_dict.keys():
+        model_dict[key] *= 0
+        for remote_model in local_model_dicts:
+            model_dict[key] += (remote_model[key] / total_len)
+    return model_dict
+
+
 if __name__ == '__main__':
-    train_loader1, test_loader1 = init_dataset_loader('mnist', 64)
-    train_loader2, test_loader2 = init_dataset_loader('mnist', 64)
-    model1 = Model.init_model('mnist')
-    model2 = Model.init_model('mnist')
-    loss_list1 = []
-    acc_list1 = []
-    model_update_param1 = []
+    clister_id = 0
+    args = Args.Arguments()
+    torch.random.manual_seed(2)
+    init_model = Model.init_model(args.model_name)
 
-    loss_list2 = []
-    acc_list2 = []
-    model_update_param2 = []
-    for epoch in range(100):
-        model_update1 = train(model1, train_loader1)
-        model_update_param1.append(model_update1)
-        loss1, acc1 = test(model1, test_loader1)
+    client_list = [i for i in range(0,90,5)]
+    print(client_list)
 
-        loss_list1.append(loss1)
-        acc_list1.append(acc1)
+    torch.save(init_model.state_dict(), 'HCFedAvg/test_model/init_model_dict.pth')
 
-        model_update2 = train(model2, train_loader2)
-        model_update_param2.append(model_update2)
-        loss2, acc2 = test(model2, test_loader2)
+    AvgModel = copy.deepcopy(init_model)
 
-        loss_list2.append(loss2)
-        acc_list2.append(acc2)
-        print('Global_Epoch: {}  ,  Loss 1: {:.5f},  Acc 1: {:.4f},  Loss 2: {:.5f},  Acc 2: {:.4f}\n'
-              .format(epoch + 1, loss1, acc1, loss2, acc2, ))
+    dataGen = HCFedAvg.DataGenerater.DatasetGen(args)
 
-        # pca_dim_deduction(np.array([model_update1[0]]))
-        # print(KMeansPP.get_cos_dis_single_layer(pca_dim_deduction(np.array([model_update1[0].tolist()]), 3), pca_dim_deduction(np.array([model_update2[0].tolist()]), 3)))
+    test_data_loader = dataGen.get_cluster_test_DataLoader(clister_id)
+    data_loader_list = [dataGen.get_client_DataLoader(client) for client in client_list]
+    data_loader_95 = dataGen.get_client_DataLoader(95)
+    data_loader_90 = dataGen.get_client_DataLoader(90)
+
+    is_train = {client: False for client in client_list}
+
+    signal_model_deep_list_95 = []
+    signal_model_deep_list_90 = []
+    avg_model_deep_list = []
 
 
-    torch.save(model_update_param1,
-               "DeepModelSimality" + '/' + 'param_grad_1_.pt')
+    for i in range(100):
+        train_clients = random.sample(client_list, 2)
+        avg_list = []
+        for client_id, _ in enumerate(train_clients):
+            if is_train[_]:
+                model_eval = train(AvgModel, data_loader_list[client_id])
+            else:
+                model_eval = train(copy.deepcopy(init_model), data_loader_list[client_id])
+                is_train[_] = True
 
-    torch.save(model_update_param2,
-               "DeepModelSimality" + '/' + 'param_grad_2_.pt')
+            avg_list.append(model_eval.state_dict())
+        print('epoch: ', i)
+
+        AvgModel.load_state_dict(avg(copy.deepcopy(init_model).state_dict(), avg_list))
+        avg_model_deep_list.append(copy.deepcopy(AvgModel.state_dict()[args.deep_model_layer_name]))
+        if i % 5 == 0:
+            sigal_model = copy.deepcopy(AvgModel)
+            train(sigal_model, data_loader_95)
+            signal_model_deep_list_95.append(copy.deepcopy(sigal_model.state_dict()[args.deep_model_layer_name]))
+
+            sigal_model = copy.deepcopy(AvgModel)
+            train(sigal_model, data_loader_90)
+            signal_model_deep_list_90.append(copy.deepcopy(sigal_model.state_dict()[args.deep_model_layer_name]))
+
+            loss, acc = test(sigal_model, test_data_loader)
+            print('signal_model : ', 'acc: ', acc, ' loss', loss)
+
+
+        loss, acc = test(AvgModel, test_data_loader)
+        print('avg_model : ', 'acc: ', acc, ' loss', loss)
+
+
+    torch.save(avg_model_deep_list, 'HCFedAvg/test_model/avg_model_deep_.pth')
+    torch.save(signal_model_deep_list_95, 'HCFedAvg/test_model/signal_model_deep_95.pt')
+    torch.save(signal_model_deep_list_90, 'HCFedAvg/test_model/signal_model_deep_90.pt')
+
+

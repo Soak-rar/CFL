@@ -75,6 +75,8 @@ class DatasetGen:
         data_index = self.ClientsDataInfo[client_id].DataIndex
         data = self.Data[data_index]
         label = self.Label[data_index]
+        # print(label)
+        # print(data[0].shape)
         # print(label.shape)
         train_dataset = TensorDataset(data,
                                       label)
@@ -90,12 +92,13 @@ class DatasetGen:
         data_index = []
         for label in cluster_labels:
             data_index.extend(self.TestLabelDataIndex[label])
+        print('cluster_id, ', cluster_id)
 
         test_data = self.TestData[data_index]
         test_label = self.TestLabel[data_index]
         test_dataset = TensorDataset(test_data,
                                      test_label)
-
+        print('cluster_labels', test_label)
         test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=True)
         return test_loader
 
@@ -122,58 +125,76 @@ class DatasetGen:
                 self.ClientsDataInfo.append(ClientDataInfo((i % cluster_num), i))
     # 加载预处理数据集
     def load_dataset(self):
+        trans = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.1307,), (0.3081,))
+        ])
         if self.mArgs.dataset_name == 'mnist':
-            dataset = datasets.MNIST('data', train=True, download=True)
-            dataset_test = datasets.MNIST('data', train=False, download=True)
+            dataset = datasets.MNIST('data', train=True, download=True, transform=trans)
+            dataset_test = datasets.MNIST('data', train=False, download=True, transform=trans)
             # 数据集转换标准化
-            trans = transforms.Compose([
-                transforms.ToTensor(),
-                transforms.Normalize((0.1307,), (0.3081,))
-            ])
+
         elif self.mArgs.dataset_name == 'cifar10':
-            dataset = datasets.CIFAR10('data', train=True, download=True)
-            dataset_test = datasets.CIFAR10('data', train=False, download=True)
             trans = transforms.Compose([
                 transforms.ToTensor(),
                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
             ])
+            dataset = datasets.CIFAR10('data', train=True, download=True, transform=trans)
+            dataset_test = datasets.CIFAR10('data', train=False, download=True, transform=trans)
+
         else:
             dataset = None
             dataset_test = None
-            trans = None
 
-        return dataset, dataset_test, trans
+        if dataset is not None:
+            data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
+            test_data_loader = DataLoader(dataset_test, batch_size=1, shuffle=True)
+        else:
+            data_loader = None
+            test_data_loader = None
+
+        return data_loader, test_data_loader
 
 
     def normalize_dataset(self):
-        dataset, dataset_test, trans = self.load_dataset()
-        assert dataset is not True
-        # 将图片的int类型改为float
-        dataset.data = dataset.data.float()
-        dataset_test.data = dataset_test.data.float()
+        data_loader, test_data_loader = self.load_dataset()
+        assert data_loader is not None
 
-        # 图片数据标准化
         data_list = []
-        for i, data in enumerate(dataset.data):
-            data_list.append(trans(data.numpy()).numpy())
+        label_list = []
 
-        data_test_list = []
-        for i, data in enumerate(dataset_test.data):
-            data_test_list.append(trans(data.numpy()).numpy())
+        test_data_list = []
+        test_label_list = []
+
+        for data_, label_ in iter(data_loader):
+            data_list.append(data_[0].numpy())
+            label_list.append(label_[0].numpy())
+
+        random.seed(15)
+        random.shuffle(data_list)
+
+        random.seed(15)
+        random.shuffle(label_list)
+
+        print(label_list[0])
+
+        for data_, label_ in iter(test_data_loader):
+            test_data_list.append(data_[0].numpy())
+            test_label_list.append(label_[0].numpy())
+
+        self.Data = torch.tensor(np.array(data_list))
+        self.Label = torch.tensor(np.array(label_list))
+        self.TestData = torch.tensor(np.array(test_data_list))
+        self.TestLabel = torch.tensor(np.array(test_label_list))
 
         self.LabelDataIndex = [[] for _ in range(self.mArgs.dataset_labels_number)]
-        for i, label in enumerate(dataset.targets):
+        for i, label in enumerate(label_list):
             self.LabelDataIndex[label.item()].append(i)
 
         self.TestLabelDataIndex = [[] for _ in range(self.mArgs.dataset_labels_number)]
-        for i, label in enumerate(dataset_test.targets):
+        for i, label in enumerate(test_label_list):
             self.TestLabelDataIndex[label.item()].append(i)
 
-
-        self.Data = torch.tensor(np.array(data_list))
-        self.Label = dataset.targets
-        self.TestData = torch.tensor(np.array(data_test_list))
-        self.TestLabel = dataset_test.targets
 
     def divide_clients_data_index(self):
         if self.mArgs.data_info['divide_type'] == 'labels':

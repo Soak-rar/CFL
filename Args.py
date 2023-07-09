@@ -3,20 +3,22 @@ import copy
 
 class Arguments:
     def __init__(self):
-        self.batch_size = 200
+        self.batch_size = 64
         self.test_batch_size = 64
-        self.local_epochs = 2
-        self.lr = 0.001
+        self.local_epochs = 1
+        self.lr = 0.0005
         self.save_model = True
-        self.global_round = 100
+        self.global_round = 200
         # 'cifar10'   'mnist'
-        self.dataset_name = 'mnist'
-        self.model_name = 'mnist'
+        self.dataset_name = 'cifar10'
+        self.model_name = 'AlexNetCIFAR'
         self.dataset_labels_number = 10
         self.worker_num = 100
         self.test_worker_num = 200
         self.worker_train = 10
         self.cluster_worker_train = 2
+        self.deep_model_layer_name = 'classifier.6.weight'
+        self.MaxProcessNumber = 3
 
         # 每个本地客户端分配的数据数量
         self.local_data_size = 0.4
@@ -71,6 +73,7 @@ class ClientInServerData:
         self.DataLen = 0
         # 描述当前客户端最新的参与训练的轮次
         self.TrainRound = Round
+        self.NumRounds = 0
 
     def set_client_info(self, ModelDict, DataSize):
         self.ModelStaticDict = copy.deepcopy(ModelDict)

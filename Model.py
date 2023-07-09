@@ -14,6 +14,10 @@ class Cifar10Model(nn.Module):
         self.fc3 = nn.Linear(84, 20)
         self.fc4 = nn.Linear(20, 10)
 
+    def share_memory(self):
+        for param in self.parameters():
+            param.share_memory_()
+
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
@@ -36,6 +40,10 @@ class NewCifar10Model(nn.Module):
         self.fc3 = nn.Linear(192, 10)
         self.dropout = nn.Dropout(0.1)
 
+    def share_memory(self):
+        for param in self.parameters():
+            param.share_memory_()
+
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
@@ -57,6 +65,10 @@ class MnistModel(nn.Module):
         self.fc4 = nn.Linear(20, 10)
         self.drop = nn.Dropout(0.2)
 
+    def share_memory(self):
+        for param in self.parameters():
+            param.share_memory_()
+
     def forward(self, x):
         x = F.relu(self.conv1(x))
         x = F.max_pool2d(x, 2, 2)
@@ -69,27 +81,28 @@ class MnistModel(nn.Module):
         return F.log_softmax(self.fc4(x), dim=1)
 
 
-class AlexNet(nn.Module):
+class AlexNetCIFAR(nn.Module):
     def __init__(self, num_classes=10):
-        super(AlexNet, self).__init__()
+        super(AlexNetCIFAR, self).__init__()
         self.features = nn.Sequential(
-            nn.Conv2d(3, 64, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=2),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2),
-            nn.Conv2d(64, 192, kernel_size=3, padding=1),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(64, 192, kernel_size=3, padding=2),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2),
+            nn.MaxPool2d(kernel_size=2, stride=2),
             nn.Conv2d(192, 384, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(384, 256, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(256, 256, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2),
+            nn.MaxPool2d(kernel_size=2, stride=2),
         )
+        self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
         self.classifier = nn.Sequential(
             nn.Dropout(),
-            nn.Linear(256 * 2 * 2, 4096),
+            nn.Linear(256 * 6 * 6, 4096),
             nn.ReLU(inplace=True),
             nn.Dropout(),
             nn.Linear(4096, 4096),
@@ -99,9 +112,15 @@ class AlexNet(nn.Module):
 
     def forward(self, x):
         x = self.features(x)
-        x = x.view(x.size(0), 256 * 2 * 2)
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
         x = self.classifier(x)
-        return F.log_softmax(F.relu(x), dim=1), x
+        x = F.log_softmax(x, dim=1)  # 使用log_softmax作为激活函数
+        return x
+
+    def share_memory(self):
+        for param in self.parameters():
+            param.share_memory_()
 
 class SimpleLinear(nn.Module):
 
@@ -109,6 +128,10 @@ class SimpleLinear(nn.Module):
         super().__init__()
         self.fc1 = torch.nn.Linear(28*28, h1)
         self.fc2 = torch.nn.Linear(h1, 10)
+
+    def share_memory(self):
+        for param in self.parameters():
+            param.share_memory_()
 
     def forward(self, x):
         x = x.view(-1, 28 * 28)
@@ -126,6 +149,8 @@ def init_model(model_name):
         return NewCifar10Model()
     elif model_name == "simple_mnist":
         return SimpleLinear()
+    elif model_name == "AlexNetCIFAR":
+        return AlexNetCIFAR()
     else:
         return None
 

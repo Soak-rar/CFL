@@ -1,3 +1,4 @@
+import math
 from typing import Dict, List
 import copy
 from Args import ClientInServerData
@@ -12,6 +13,7 @@ class HCCluster:
         self.ClientNumber = len(init_clients)
         self.set_max_in_cluster_distance(similarity_matrix)
         self.AvgClusterModelDict = None
+        self.CurrentModelRound = 0
 
 
     def get_avg_cluster_model_copy(self):
@@ -44,29 +46,57 @@ class HCCluster:
         if len(train_clients) == 0:
             return
         self.AvgClusterModelDict = copy.deepcopy(clients_model[train_clients[0]].ModelStaticDict)
+        MaxRound = 0
         total_len = 0
         if len(train_clients) > 1:
             for client_id in train_clients:
                 total_len += clients_model[client_id].DataLen
+                if clients_model[client_id].TrainRound > MaxRound:
+                    MaxRound = clients_model[client_id].TrainRound
+
+            self.CurrentModelRound = MaxRound
+
             for key in self.AvgClusterModelDict.keys():
                 self.AvgClusterModelDict[key] *= 0
                 for client_id in train_clients:
                     self.AvgClusterModelDict[key] += (clients_model[client_id].ModelStaticDict[key] * clients_model[client_id].DataLen / total_len)
 
 
-    def set_avg_cluster_model_with_time(self, clients_model: Dict[int, ClientInServerData]):
+
+    def set_avg_cluster_model_with_time(self, clients_model: Dict[int, ClientInServerData], train_clients):
+
+        # self.AvgClusterModelDict = copy.deepcopy(clients_model[self.Clients[0]].ModelStaticDict)
+        # MaxRound = 0
+        # e_sum = 0.0
+        # for client_id in train_clients:
+        #     client_round = clients_model[client_id].TrainRound
+        #     e_sum += math.exp(client_round)
+        #     if clients_model[client_id].TrainRound > MaxRound:
+        #         MaxRound = clients_model[client_id].TrainRound
+        #
+        # self.CurrentModelRound = MaxRound
+        #
+        # for key in self.AvgClusterModelDict.keys():
+        #     self.AvgClusterModelDict[key] *= 0
+        #     for client_id in train_clients:
+        #         self.AvgClusterModelDict[key] += (clients_model[client_id].ModelStaticDict[key]) * (math.exp(clients_model[client_id].TrainRound)) / e_sum
 
         self.AvgClusterModelDict = copy.deepcopy(clients_model[self.Clients[0]].ModelStaticDict)
+        MaxRound = 0
+        e_sum = 0.0
         total_len = 0
-        total_time = 0
-        for client_id in self.Clients:
+        for client_id in train_clients:
+            client_round = clients_model[client_id].TrainRound
             total_len += clients_model[client_id].DataLen
-            total_time += clients_model[client_id].TrainRound + 1
-        print(" total_time:  ", total_time)
+            if clients_model[client_id].TrainRound > MaxRound:
+                MaxRound = clients_model[client_id].TrainRound
+
+        self.CurrentModelRound = MaxRound
+
         for key in self.AvgClusterModelDict.keys():
             self.AvgClusterModelDict[key] *= 0
-            for client_id in self.Clients:
-                self.AvgClusterModelDict[key] += (clients_model[client_id].ModelStaticDict[key]) * (clients_model[client_id].TrainRound + 1) / total_time
+            for client_id in train_clients:
+                self.AvgClusterModelDict[key] += (clients_model[client_id].ModelStaticDict[key]) *  clients_model[client_id].DataLen / total_len
 
     def set_max_in_cluster_distance(self, similarity_matrix: Dict[int, Dict[int, float]]):
         for client_id_l in self.Clients:
@@ -111,7 +141,7 @@ class HCClusterManager:
                         MinClusterIDPair[0] = Cluster_ID
                         MinClusterIDPair[1] = OtherCluster_ID
 
-            if MinDisBetweenTwoClusters > 0.0001:
+            if MinDisBetweenTwoClusters > 0.20:
                 print('  迭代-----------')
                 for cluster_id, cluster in self.CurrentClusters.items():
                     print(cluster_id, "  , ", cluster.Clients)
@@ -167,8 +197,8 @@ class HCClusterManager:
         for cluster_id, Cluster in self.CurrentClusters.items():
             for client_id in Cluster.Clients:
                 clients_model[client_id].set_client_InClusterID(cluster_id)
-            # train_clients = self.get_last_train_clients(clients_model, Cluster.Clients)
-            Cluster.set_avg_cluster_model_with_time(clients_model)
+            train_clients = self.get_last_train_clients(clients_model, Cluster.Clients)
+            Cluster.set_avg_cluster_model_with_time(clients_model,train_clients)
 
     def get_last_train_clients(self, clients_model: Dict[int, ClientInServerData], Clients:[int]):
         max_round = 0
@@ -188,8 +218,17 @@ class HCClusterManager:
     #         print("集群： {},  客户端：{}".format(cluster_id, Cluster.Clients))
 
     def calculate_clusters_sd(self):
+        dict_clients = {}
+
+        for cluster_id, ClusterClass in self.CurrentClusters.items():
+            for client_id in ClusterClass.Clients:
+                dict_clients[client_id] = 0
+
+        print('当前的集群数量： ', len(self.CurrentClusters))
+        print('当前的参与过训练的客户端数量： ', len(dict_clients))
         print("    集群标准差    ")
         for cluster_id, ClusterClass in self.CurrentClusters.items():
+
             sd_value, avg_value = ClusterClass.calculate_sd(self.CurrentSimilarityMatrix)
             print("集群： {}, 标准差： {}, 平均数: {}".format(cluster_id, sd_value, avg_value))
 
