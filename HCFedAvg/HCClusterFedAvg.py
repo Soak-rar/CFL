@@ -372,7 +372,7 @@ def calculate_relative_similarity(clients_model, global_model, round_clients, ol
             # client_l_model_dict = Client_l.ModelStaticDict
             for client_id_r, Client_r in clients_model.items():
                 client_r_avg_param = avg_deep_param_with_dir(Client_r.ModelStaticDict, global_model.state_dict(), args)
-                if Client_l.InClusterID == Client_r.InClusterID:
+                if Client_l.InClusterID == Client_r.InClusterID and Client_l.ClientID != Client_r.ClientID:
                     client_l_pre_param = avg_deep_param_with_dir(Client_l.PreModelStaticDict, global_model.state_dict(), args)
                     client_r_pre_param = avg_deep_param_with_dir(Client_r.PreModelStaticDict, global_model.state_dict(), args)
                 # client_r_model_dict = Client_r.ModelStaticDict
@@ -408,12 +408,12 @@ def calculate_min_dis(model_dict_1, model_dict_2, client_l_pre_dict, client_r_pr
 
 def init_test_dataset_loader(dataset_name, batch_size):
     if dataset_name == 'mnist':
-        dataset = datasets.MNIST(root='../data', train=False, transform=transforms.Compose([
+        dataset = datasets.MNIST(root='data', train=False, transform=transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.1307,), (0.3081,))]))
         return DataLoader(dataset, batch_size=batch_size, shuffle=False)
     elif dataset_name == 'cifar10':
-        dataset = datasets.CIFAR10(root='../data', train=False, transform=transforms.Compose([
+        dataset = datasets.CIFAR10(root='data', train=False, transform=transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]))
         return DataLoader(dataset, batch_size=batch_size, shuffle=False)
