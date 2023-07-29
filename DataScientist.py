@@ -3,10 +3,7 @@ import torch
 import Args
 from matplotlib import pyplot as plt
 from sklearn.decomposition import PCA
-import pandas
-import threading
-import multiprocessing
-import data.ff
+
 
 
 def pca_dim_deduction(high_dim_data, max_dim):
