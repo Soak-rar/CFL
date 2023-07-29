@@ -163,6 +163,7 @@ def main(mArgs):
     save_dict['traffic'] = 200 * 100
     save_dict['acc_list'] = TotalAcc
     save_dict['loss_list'] = TotalLoss
+    save_dict['final_cluster_number'] = len(clusters)
 
     FileProcess.add_row(save_dict)
 

@@ -59,7 +59,7 @@ class Arguments:
         self.Arg_string = '实验描述：\n' + text + '\n' + '**************************\n' + self.list_all_member()
 
     def save_dict(self):
-        str_dict = {'algorithm_name': "", 'acc': 0, 'loss': 0, 'traffic': 0,
+        str_dict = {'algorithm_name': "", 'acc': 0, 'loss': 0, 'traffic': 0,'final_cluster_number': 0,
             'batch_size': self.batch_size, 'local_epoch': self.local_epochs, 'lr': self.lr,
                     'global_round': self.global_round, 'dataset': self.dataset_name, 'model': self.model_name,
                     'worker_num': self.worker_num, 'worker_train': self.worker_train,

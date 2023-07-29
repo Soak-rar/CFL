@@ -29,6 +29,9 @@ import torch.multiprocessing as mp
 import DataGenerater
 from torch.multiprocessing import SimpleQueue, Manager
 import time
+
+from HCFedAvg import FileProcess
+
 if mp.get_start_method() != 'spawn':
     mp.set_start_method('spawn')
 HC_queue = SimpleQueue()
@@ -294,29 +297,19 @@ def main(args):
         TotalLoss.append(np.mean(epoch_loss))
         TotalAcc.append(np.mean(epoch_acc))
         print('acc_list : ', epoch_acc)
-        print("Epoch: {}\t, FedAvg\t: Acc : {}\t, Loss : {}\t".format(epoch, FedAvg_Acc[epoch], FedAvg_Loss[epoch]))
+        # print("Epoch: {}\t, FedAvg\t: Acc : {}\t, Loss : {}\t".format(epoch, FedAvg_Acc[epoch], FedAvg_Loss[epoch]))
         print("Epoch: {}\t, HCCFL\t: Acc : {}\t, Loss : {}\t".format(epoch, TotalAcc[epoch], TotalLoss[epoch]))
 
+    save_dict = args.save_dict()
+    save_dict['algorithm_name'] = 'HCCFL'
+    save_dict['acc'] = max(TotalAcc)
+    save_dict['loss'] = min(TotalLoss)
+    save_dict['traffic'] = 200*10
+    save_dict['acc_list'] = TotalAcc
+    save_dict['loss_list'] = TotalLoss
+    save_dict['final_cluster_number'] = len(ClusterManager.CurrentClusters)
 
-    SavePath = args.save_path
-    if not os.path.exists(SavePath):
-        # 如果文件夹不存在，则创建
-        os.makedirs(SavePath)
-        print(f"文件夹 '{SavePath}' 创建成功！")
-    else:
-        print(f"文件夹 '{SavePath}' 已存在。")
-    # torch.save(client_update_grad,
-    #            SavePath + '.pt')
-    torch.save(FedAvg_Loss,
-               SavePath + '/_FedAvg_Loss.pt')
-    torch.save(FedAvg_Acc,
-               SavePath + '/_FedAvg_Acc.pt')
-    # torch.save(client_update_grad_with_,
-    #            SavePath + '_weighting_grad.pt')
-    torch.save(TotalLoss,
-               SavePath + '/_HCCFL_Loss.pt')
-    torch.save(TotalAcc,
-               SavePath + '/_HCCFL_Acc.pt')
+    FileProcess.add_row(save_dict)
 
 
 def L2_Distance(tensor1, tensor2, Use_cos = False):

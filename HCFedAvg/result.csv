@@ -1,1 +1,1 @@
-algorithm_name,acc,loss,traffic,batch_size,local_epoch,lr,global_round,dataset,model,worker_num,worker_train,deep_model_name,optim,data_type,data_info,acc_list,loss_list
+algorithm_name,acc,loss,traffic,final_cluster_number,batch_size,local_epoch,lr,global_round,dataset,model,worker_num,worker_train,deep_model_name,optim,data_type,data_info,acc_list,loss_list
