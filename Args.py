@@ -11,14 +11,16 @@ class Arguments:
         self.global_round = 200
         # 'cifar10'   'mnist'
         self.dataset_name = 'cifar10'
-        self.model_name = 'AlexNetCIFAR'
+        self.model_name = "NewCifar10"
         self.dataset_labels_number = 10
         self.worker_num = 100
         self.test_worker_num = 200
         self.worker_train = 10
         self.cluster_worker_train = 2
-        self.deep_model_layer_name = 'classifier.6.weight'
+        self.deep_model_layer_name = 'fc3.weight'
         self.MaxProcessNumber = 3
+
+        self.optim = 'Adam' # 'SGD', 'Adam'
 
         # 每个本地客户端分配的数据数量
         self.local_data_size = 0.4
@@ -30,10 +32,10 @@ class Arguments:
         # 数据分布
         self.dataset_labels_num = 10
         self.data_info = {'data_labels': [[0,1,2,3], [2,3,4,5], [4,5,6,7], [6,7,8,9], [0,1,8,9]],
-                          'data_rot': [0, 1, 2, 3, 0],
+                          'data_rot': [0, 1, 2, 3],
                           'divide_type': 'labels'}# 'rot'
 
-        self.cluster_number = 5
+        self.cluster_number = len(self.data_info["data_labels"]) if self.data_info["divide_type"]=="labels" else len(self.data_info["data_rot"])
         self.cuda = True
         self.save_path = ""
         if len(self.data_info) > 0:
@@ -55,6 +57,22 @@ class Arguments:
 
     def to_string(self, text=''):
         self.Arg_string = '实验描述：\n' + text + '\n' + '**************************\n' + self.list_all_member()
+
+    def save_dict(self):
+        str_dict = {'algorithm_name': "", 'acc': 0, 'loss': 0, 'traffic': 0,
+            'batch_size': self.batch_size, 'local_epoch': self.local_epochs, 'lr': self.lr,
+                    'global_round': self.global_round, 'dataset': self.dataset_name, 'model': self.model_name,
+                    'worker_num': self.worker_num, 'worker_train': self.worker_train,
+                    'deep_model_name': self.deep_model_layer_name, 'optim': self.optim,
+                    'data_type': self.data_info["divide_type"],
+                    'data_info': self.data_info["data_labels"] if self.data_info["divide_type"] == "labels" else
+                    self.data_info["data_rot"],
+                    'acc_list': [],
+                    'loss_list': []}
+        return str_dict
+
+
+
 
 
 class KMeansArgs:

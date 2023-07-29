@@ -1,4 +1,5 @@
 # 读取并 预处理数据集， 同时根据需求生成 客户端 数据索引列表
+import copy
 from typing import *
 
 import torch
@@ -45,11 +46,8 @@ class DatasetGen:
         self.ClusterTestDataIndex = [[] for i in range(self.mArgs.cluster_number)]
 
         self.init_client_data_list()
-        self.load_dataset()
         self.normalize_dataset()
         self.divide_clients_data_index()
-        # self.get_client_DataLoader(27)
-        # self.print_img()
 
     def print_img(self):
         for i in range(4):
@@ -71,36 +69,61 @@ class DatasetGen:
         return test_loader
 
     def get_client_DataLoader(self, client_id):
-        # 如果是 'labels' 直接生成Loader
-        data_index = self.ClientsDataInfo[client_id].DataIndex
+        ClientInfo = self.ClientsDataInfo[client_id]
+        data_index = ClientInfo.DataIndex
         data = self.Data[data_index]
         label = self.Label[data_index]
-        # print(label)
-        # print(data[0].shape)
-        # print(label.shape)
-        train_dataset = TensorDataset(data,
-                                      label)
 
-        train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, drop_last=True)
-        # save_image(data[1], "%d.png" % 1, nrow=5, normalize=True)
 
-        return train_loader
         # 如果是 'rot' 旋转数据生成Loader
+        if ClientInfo.IsRot:
+            if ClientInfo.Rot > 0:
+
+                X_batch2 = torch.rot90(data, k=int(ClientInfo.Rot), dims=(2, 3))
+                train_dataset = TensorDataset(X_batch2,
+                                              label)
+                train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, drop_last=True)
+                return train_loader
+            else:
+                train_dataset = TensorDataset(data,
+                                              label)
+                train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, drop_last=True)
+                return train_loader
+        # 如果是 'labels' 直接生成Loader
+        else:
+            train_dataset = TensorDataset(data,
+                                          label)
+            train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, drop_last=True)
+            return train_loader
 
     def get_cluster_test_DataLoader(self, cluster_id):
-        cluster_labels = self.mArgs.data_info['data_labels'][cluster_id]
-        data_index = []
-        for label in cluster_labels:
-            data_index.extend(self.TestLabelDataIndex[label])
-        print('cluster_id, ', cluster_id)
+        if self.mArgs.data_info["divide_type"] == 'labels':
 
-        test_data = self.TestData[data_index]
-        test_label = self.TestLabel[data_index]
-        test_dataset = TensorDataset(test_data,
-                                     test_label)
-        print('cluster_labels', test_label)
-        test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=True)
-        return test_loader
+            cluster_labels = self.mArgs.data_info['data_labels'][cluster_id]
+            data_index = []
+            for label in cluster_labels:
+                data_index.extend(self.TestLabelDataIndex[label])
+
+            test_data = self.TestData[data_index]
+            test_label = self.TestLabel[data_index]
+            test_dataset = TensorDataset(test_data,
+                                         test_label)
+
+            test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=True)
+            return test_loader
+        elif self.mArgs.data_info["divide_type"] == 'rot':
+            rot = self.mArgs.data_info['data_rot'][cluster_id]
+            data = copy.deepcopy(self.TestData)
+            label = copy.deepcopy(self.TestLabel)
+            if rot > 0:
+                X_batch2 = torch.rot90(data, k=int(rot), dims=(2, 3))
+                test_dataset = TensorDataset(X_batch2,
+                                              label)
+            else:
+                test_dataset = TensorDataset(data,
+                                             label)
+            test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=True)
+            return test_loader
 
         # data_index = self.ClusterTestDataIndex[cluster_id]
         #
@@ -115,8 +138,8 @@ class DatasetGen:
 
     def init_client_data_list(self):
         cluster_num = self.mArgs.cluster_number
-        assert cluster_num == len(self.mArgs.data_info['data_labels'])
-        assert cluster_num == len(self.mArgs.data_info['data_rot'])
+        # assert cluster_num == len(self.mArgs.data_info['data_labels'])
+        # assert cluster_num == len(self.mArgs.data_info['data_rot'])
 
         for i in range(self.mArgs.worker_num):
             if self.mArgs.data_info['divide_type'] == 'rot':
@@ -175,8 +198,6 @@ class DatasetGen:
 
         random.seed(15)
         random.shuffle(label_list)
-
-        print(label_list[0])
 
         for data_, label_ in iter(test_data_loader):
             test_data_list.append(data_[0].numpy())
@@ -277,9 +298,21 @@ class DatasetGen:
             cluster_number = self.mArgs.cluster_number
             assert cluster_number == len(self.mArgs.data_info['data_rot'])
             client_number_pre_cluster = self.mArgs.worker_num // cluster_number
-            for cluster_id in range(cluster_number):
-                
-                pass
+
+            label_pre_len = {}
+
+            for label, label_list in enumerate(self.LabelDataIndex):
+                label_pre_len[label] = len(label_list) // client_number_pre_cluster
+
+
+            clusters_start_pos = [[0 for _ in range(self.mArgs.worker_num) ] for i in range(cluster_number)]
+
+            for client_data in self.ClientsDataInfo:
+                for label, label_list in enumerate(self.LabelDataIndex):
+                    start_pos = clusters_start_pos[client_data.InClusterID][label]
+                    end_pos = start_pos + label_pre_len[label]
+                    client_data.DataIndex.extend(label_list[start_pos: end_pos])
+                    clusters_start_pos[client_data.InClusterID][label] = end_pos
 
         else:
             pass

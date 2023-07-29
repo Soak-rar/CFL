@@ -110,15 +110,13 @@ def avg(model_dict, local_model_dicts):
 
 def create_process(model_1, model_2, DataGen:DatasetGen, worker_id, device, args, queue_1, queue_2, shared_models_1, shared_models_2):
     train(model_1, DataGen.get_client_DataLoader(worker_id), worker_id, device, args, queue_1, shared_models_1)
-    train(model_2, DataGen.get_client_DataLoader(worker_id), worker_id, device, args, queue_2, shared_models_2)
+    # train(model_2, DataGen.get_client_DataLoader(worker_id), worker_id, device, args, queue_2, shared_models_2)
 
 
 
 
 def main(args):
-    seed_ = 100
-    np.random.seed(seed_)
-    torch.manual_seed(seed_)
+
     datasetGen = DatasetGen(args)
     # DataSet = Data.generate_rotated_data(args)
 
@@ -251,13 +249,19 @@ def main(args):
             std_m.extend(value.values())
         std = np.mean(std_m)
         print('mean: ', std)
-
+        t1 = time.time()
         ClusterManager.HCClusterDivide()
+        t2 = time.time()
+
+        print("Clustering Time: ", t2-t1)
 
         # ClusterManager.print_divide_result()
 
         # ClusterManager.UpdateClusterAvgModel(clients_model, cluster_clients_train)
+        t1 = time.time()
         ClusterManager.UpdateClusterAvgModelWithTime(clients_model, cluster_clients_train)
+        t2 = time.time()
+        print("Avg Time: ", t2 - t1)
         epoch_loss = []
         epoch_acc = []
 
@@ -282,11 +286,11 @@ def main(args):
 
 
         ## FedAvg聚合
-        FedAvg_global_model.load_state_dict(avg(FedAvg_global_model.state_dict(), FedAvg_local_models))
-        FedAvgTestDataLoader = datasetGen.get_fedavg_test_DataLoader()
-        loss, acc = test(FedAvg_global_model, FedAvgTestDataLoader, device)
-        FedAvg_Loss.append(loss)
-        FedAvg_Acc.append(acc)
+        # FedAvg_global_model.load_state_dict(avg(FedAvg_global_model.state_dict(), FedAvg_local_models))
+        # FedAvgTestDataLoader = datasetGen.get_fedavg_test_DataLoader()
+        # loss, acc = test(FedAvg_global_model, FedAvgTestDataLoader, device)
+        # FedAvg_Loss.append(loss)
+        # FedAvg_Acc.append(acc)
         TotalLoss.append(np.mean(epoch_loss))
         TotalAcc.append(np.mean(epoch_acc))
         print('acc_list : ', epoch_acc)
@@ -294,19 +298,25 @@ def main(args):
         print("Epoch: {}\t, HCCFL\t: Acc : {}\t, Loss : {}\t".format(epoch, TotalAcc[epoch], TotalLoss[epoch]))
 
 
-    SavePath = args.save_path + 'NewData_round_100_WithTimeAvg_HCCFL_FedAvg_Loss_Acc_0'
+    SavePath = args.save_path
+    if not os.path.exists(SavePath):
+        # 如果文件夹不存在，则创建
+        os.makedirs(SavePath)
+        print(f"文件夹 '{SavePath}' 创建成功！")
+    else:
+        print(f"文件夹 '{SavePath}' 已存在。")
     # torch.save(client_update_grad,
     #            SavePath + '.pt')
     torch.save(FedAvg_Loss,
-               SavePath + '_FedAvg_Loss.pt')
+               SavePath + '/_FedAvg_Loss.pt')
     torch.save(FedAvg_Acc,
-               SavePath + '_FedAvg_Acc.pt')
+               SavePath + '/_FedAvg_Acc.pt')
     # torch.save(client_update_grad_with_,
     #            SavePath + '_weighting_grad.pt')
     torch.save(TotalLoss,
-               SavePath + '_HCCFL_Loss.pt')
+               SavePath + '/_HCCFL_Loss.pt')
     torch.save(TotalAcc,
-               SavePath + '_HCCFL_Acc.pt')
+               SavePath + '/_HCCFL_Acc.pt')
 
 
 def L2_Distance(tensor1, tensor2, Use_cos = False):
@@ -371,13 +381,14 @@ def calculate_relative_similarity(clients_model, global_model, round_clients, ol
             client_l_avg_param = avg_deep_param_with_dir(Client_l.ModelStaticDict, global_model.state_dict(), args)
             # client_l_model_dict = Client_l.ModelStaticDict
             for client_id_r, Client_r in clients_model.items():
+                ex_dis = 0
                 client_r_avg_param = avg_deep_param_with_dir(Client_r.ModelStaticDict, global_model.state_dict(), args)
                 if Client_l.InClusterID == Client_r.InClusterID and Client_l.ClientID != Client_r.ClientID:
                     client_l_pre_param = avg_deep_param_with_dir(Client_l.PreModelStaticDict, global_model.state_dict(), args)
                     client_r_pre_param = avg_deep_param_with_dir(Client_r.PreModelStaticDict, global_model.state_dict(), args)
                 # client_r_model_dict = Client_r.ModelStaticDict
                 # min_dis = calculate_min_dis(client_l_model_dict, client_r_model_dict, Client_l.PreModelStaticDict, Client_r.PreModelStaticDict, args)
-                ex_dis = L2_Distance(client_l_pre_param, client_r_pre_param, True)
+                    ex_dis = L2_Distance(client_l_pre_param, client_r_pre_param, True)
                 all_dis = L2_Distance(client_l_avg_param, client_r_avg_param, True)
                 Dis = abs(ex_dis-all_dis)
                 similarity_matrix[client_id_l][client_id_r] = Dis
