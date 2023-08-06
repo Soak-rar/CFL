@@ -119,7 +119,7 @@ def main(mArgs):
 
     device = torch.device("cuda:0" if torch.cuda.is_available() and args.cuda else "cpu")
 
-    torch.manual_seed(5)
+    torch.manual_seed(4)
     cluster_model_dicts = [Model.init_model(mArgs.model_name).state_dict() for i in range(cluster_num)]
     train_workers = [i for i in range(args.worker_num)]
 
