@@ -119,7 +119,7 @@ def main(mArgs):
 
     device = torch.device("cuda:0" if torch.cuda.is_available() and args.cuda else "cpu")
 
-    torch.manual_seed(4)
+    torch.manual_seed(0)
     cluster_model_dicts = [Model.init_model(mArgs.model_name).state_dict() for i in range(cluster_num)]
     train_workers = [i for i in range(args.worker_num)]
 
@@ -130,7 +130,7 @@ def main(mArgs):
         worker_model_dicts = {}
         cluster_workers = {i: [] for i in range(cluster_num)}
         cluster_clients_train = random.sample(train_workers, 100)
-        for worker_id in tqdm(cluster_clients_train, unit="client", leave=True):
+        for worker_id in tqdm(cluster_clients_train, unit="client"):
             model_dict, in_cluster_id = train(cluster_model_dicts, dataGen.get_client_DataLoader(worker_id), worker_id, device, mArgs)
             cluster_workers[in_cluster_id].append(worker_id)
             worker_model_dicts[worker_id] = model_dict
@@ -140,6 +140,8 @@ def main(mArgs):
 
 
         for cluster_id, workers in cluster_workers.items():
+            if len(workers) == 0:
+                continue
             cluster_model_dict = copy.deepcopy(cluster_model_dicts[0])
             for key in cluster_model_dict.keys():
                 cluster_model_dict[key] *= 0
