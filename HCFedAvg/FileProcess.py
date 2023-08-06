@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 import Args
-
+import ast
 # 实验结果csv文件处理
 
 def add_row(result_dict):
@@ -24,11 +24,38 @@ def create_file(filename, args: Args.Arguments):
     df.to_csv(filename + '.csv', index=False)
 
 
-if __name__ == '__main__':
+def read_all_rows():
     pass
-    #
-    # args = Args.Arguments()
-    # create_file('result', args)
-    # add_row(args.save_dict())
+
+
+def read_row(row_id):
+    df = pd.read_csv('result.csv')
+
+    # 选择第n行，行号从0开始计数
+    selected_row = df.iloc[row_id]
+    return selected_row
+
+if __name__ == '__main__':
+    args = Args.Arguments()
+    res = read_row(2)
+    # 将字符串转换为Python列表
+    float_list = ast.literal_eval(res['acc_list'])
+    # 使用列表推导式将字符串列表转换为浮点数列表
+    float_list = [float(x) for x in float_list]
+    # print(max(float_list[:200]))
+    # print(float_list)
+    print(res['algorithm_name'])
+    had = [False, False, False]
+    for i, acc in enumerate(float_list):
+        if acc >= 0.95 and had[0] is False:
+            had[0] = True
+            print(i)
+        if acc >= 0.97 and had[1] is False:
+            had[1] = True
+            print(i)
+        if acc >= 0.99 and had[2] is False:
+            had[2] = True
+            print(i)
+
 
 

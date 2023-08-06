@@ -1,48 +1,31 @@
-import collections
-from typing import Dict
+
 from DataGenerater import *
-import gc
 import HCClusterTree
-import torch
 import random
 import copy
 import math
-from sklearn.decomposition import PCA
-from matplotlib import pyplot as plt
 import Args
 from Args import ClientInServerData
-import KMeansPP
 import datetime
-import MMDLoss
-import Model
-import Data
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, TensorDataset
 import torch.nn.functional as F
 import numpy as np
 import torch.optim as optim
-import time
 import os
 import torch
 import Model
-import torch.multiprocessing as mp
-import DataGenerater
-from torch.multiprocessing import SimpleQueue, Manager
 import time
 
 from HCFedAvg import FileProcess
 
-if mp.get_start_method() != 'spawn':
-    mp.set_start_method('spawn')
-HC_queue = SimpleQueue()
-FedAvg_queue = SimpleQueue()
-from DataScientist import pca_deduce
 
-
-def train(model: torch.nn.Module, datasetLoader, worker_id, device, args, q: SimpleQueue, shared_models):
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    model.train()
-    model.to(device=device)
+def train(global_model_dict, datasetLoader, worker_id, device, args,):
+    local_model = Model.init_model(args.model_name)
+    local_model.load_state_dict(global_model_dict)
+    optimizer = optim.Adam(local_model.parameters(), lr=args.lr)
+    local_model.train()
+    local_model.to(device=device)
     data_size = 0
     avg_loss = 0
     count = 0
@@ -50,13 +33,12 @@ def train(model: torch.nn.Module, datasetLoader, worker_id, device, args, q: Sim
     for local_epoch in range(args.local_epochs):
         for batch_index, (batch_data, batch_label) in enumerate(datasetLoader):
             optimizer.zero_grad()
-
             if local_epoch == 0:
                 data_size += len(batch_data)
             batch_data = batch_data.to(device)
             batch_label = batch_label.to(device)
 
-            pred = model(batch_data)
+            pred = local_model(batch_data)
             # print(pred)
             loss = F.nll_loss(pred, batch_label)
 
@@ -68,17 +50,18 @@ def train(model: torch.nn.Module, datasetLoader, worker_id, device, args, q: Sim
             optimizer.step()
     # print(worker_id)
     # print(avg_loss)
-    model.to('cpu')
+    local_model.to('cpu')
     # print(avg_loss/count)
     data_len = data_size
     cost = 0
-    cost += sum([param.nelement() for param in model.parameters()])
-
-    # loss, acc = test(model, test_loader, device)
-    q.put({'data_len': data_len,
+    cost += sum([param.nelement() for param in local_model.parameters()])
+    return {'data_len': data_len,
            'id': worker_id,
-           'cost': cost * 4})
-    shared_models[worker_id]['model'].load_state_dict(copy.deepcopy(model.state_dict()))
+           'cost': cost * 4,
+           'model':local_model.state_dict()}
+    # loss, acc = test(model, test_loader, device)
+    # q.put()
+    # shared_models[worker_id]['model'].load_state_dict(copy.deepcopy(model.state_dict()))
 
 def test(model, dataset_loader, device):
     model.eval()
@@ -110,39 +93,24 @@ def avg(model_dict, local_model_dicts):
             model_dict[key] += (remote_model['model_dict'][key] * remote_model['data_len'] / total_len)
     return model_dict
 
-
-def create_process(model_1, model_2, DataGen:DatasetGen, worker_id, device, args, queue_1, queue_2, shared_models_1, shared_models_2):
-    train(model_1, DataGen.get_client_DataLoader(worker_id), worker_id, device, args, queue_1, shared_models_1)
-    # train(model_2, DataGen.get_client_DataLoader(worker_id), worker_id, device, args, queue_2, shared_models_2)
-
-
-
-
 def main(args):
 
     datasetGen = DatasetGen(args)
-    # DataSet = Data.generate_rotated_data(args)
-
-    manager = Manager()
 
     train_workers = [i for i in range(args.worker_num)]
 
-    global_model_test_data = init_test_dataset_loader(args.dataset_name, args.batch_size)
-
     # FedAvg算法的模型
+    torch.manual_seed(10)
+
     FedAvg_global_model = Model.init_model(args.model_name)
 
     # 每个客户端的 局部模型，初始化时为相同的模型
 
     global_model = Model.init_model(args.model_name)
 
-    avg_model = copy.deepcopy(global_model)
-
     FedAvg_global_model.load_state_dict(global_model.state_dict())
 
     clients_model: Dict[int, ClientInServerData] = {}
-
-    pre_clients_model = {}
 
     ClusterManager = HCClusterTree.HCClusterManager()
 
@@ -151,14 +119,9 @@ def main(args):
     TotalLoss = []
     TotalAcc = []
 
-    FedAvg_Loss = []
-    FedAvg_Acc = []
-
-    ProcessList = []
-
     old_matrix = {}
     for epoch in range(args.global_round):
-        # print("Epoch :{}\t,".format(epoch + 1), end='')
+
         cluster_clients_train = random.sample(train_workers, args.worker_train)
 
         for c in cluster_clients_train:
@@ -168,79 +131,23 @@ def main(args):
         if len(train_workers) == 0:
             train_workers = [i for i in range(args.worker_num)]
 
-        epoch_loss = []
-        epoch_acc = []
-
-        FedAvg_local_models = []
         print(' 参与训练的客户端 ：')
         print(cluster_clients_train)
 
-        current_train_client_model_dict = manager.dict()
-        fedavg_client_model = manager.dict()
-
-        aliving_process_number = 0
-
         for i, worker_id in enumerate(cluster_clients_train):
-
-            # print(epoch, "  worker : ", worker_id)
-
-            FirstSelected = False
 
             if clients_model.get(worker_id) is None:
                 clients_model[worker_id] = ClientInServerData(worker_id, global_model.state_dict(), worker_id, 1)
                 train_model_dict = global_model.state_dict()
-                FirstSelected = True
-
             else:
                 current_cluster = ClusterManager.get_cluster_by_id(clients_model[worker_id].InClusterID)
                 train_model_dict = current_cluster.get_avg_cluster_model_copy()
-                # train_model_dict = clients_model[worker_id].ModelStaticDict
                 clients_model[worker_id].TrainRound = current_cluster.CurrentModelRound + 1
 
-            client_model = Model.init_model(args.model_name)
-            fedavg_model = Model.init_model(args.model_name)
-            client_model.load_state_dict(train_model_dict)
-            fedavg_model.load_state_dict(FedAvg_global_model.state_dict())
             clients_model[worker_id].PreModelStaticDict = copy.deepcopy(train_model_dict)
-            current_train_client_model_dict[worker_id] = {'model': client_model, 'first': FirstSelected}
-            fedavg_client_model[worker_id] = {'model': fedavg_model, 'first': FirstSelected}
 
-            local_p = mp.Process(target=create_process, args=(client_model, fedavg_model, datasetGen, worker_id, device, args, HC_queue, FedAvg_queue, current_train_client_model_dict, fedavg_client_model))
-            ProcessList.append(local_p)
-            if len(ProcessList) == args.MaxProcessNumber or i == len(cluster_clients_train)-1:
-                for p in ProcessList:
-                    p.start()
-                for p in ProcessList:
-                    p.join()
-                ProcessList.clear()
-
-            # print( loss,"   " ,acc)
-            # epoch_loss.append(loss)
-            # epoch_acc.append(acc)
-
-
-
-        local_train_info = {}
-        fedavg_local_train_info = {}
-        while not HC_queue.empty():
-            train_info = HC_queue.get()
-            local_train_info[train_info['id']] = train_info
-        while not FedAvg_queue.empty():
-            train_info = FedAvg_queue.get()
-            fedavg_local_train_info[train_info['id']] = train_info
-
-        for worker_id, model in fedavg_client_model.items():
-            train_eval = {'model_dict': model['model'].state_dict(), 'data_len': fedavg_local_train_info[worker_id]['data_len']}
-            FedAvg_local_models.append(train_eval)
-
-        for worker_id, model_dict in current_train_client_model_dict.items():
-            clients_model[worker_id].set_client_info(model_dict['model'].state_dict(), local_train_info[worker_id]['data_len'])
-            if model_dict['first']:
-                clients_model[worker_id].PreModelStaticDict = copy.deepcopy(global_model.state_dict())
-        fedavg_client_model.clear()
-        current_train_client_model_dict.clear()
-        # 计算相似性矩阵
-        # similarity_matrix = update_client_similarity_matrix(clients_model, args)
+            train_info = train(train_model_dict, datasetGen.get_client_DataLoader(worker_id), worker_id, device, args)
+            clients_model[worker_id].set_client_info(train_info['model'], train_info['data_len'])
 
         global_si_ma = calculate_relative_similarity(clients_model, global_model, cluster_clients_train, old_matrix, args)
         old_matrix = copy.deepcopy(global_si_ma)
@@ -287,17 +194,9 @@ def main(args):
                     print(i, end=', ')
             print()
 
-
-        ## FedAvg聚合
-        # FedAvg_global_model.load_state_dict(avg(FedAvg_global_model.state_dict(), FedAvg_local_models))
-        # FedAvgTestDataLoader = datasetGen.get_fedavg_test_DataLoader()
-        # loss, acc = test(FedAvg_global_model, FedAvgTestDataLoader, device)
-        # FedAvg_Loss.append(loss)
-        # FedAvg_Acc.append(acc)
         TotalLoss.append(np.mean(epoch_loss))
         TotalAcc.append(np.mean(epoch_acc))
         print('acc_list : ', epoch_acc)
-        # print("Epoch: {}\t, FedAvg\t: Acc : {}\t, Loss : {}\t".format(epoch, FedAvg_Acc[epoch], FedAvg_Loss[epoch]))
         print("Epoch: {}\t, HCCFL\t: Acc : {}\t, Loss : {}\t".format(epoch, TotalAcc[epoch], TotalLoss[epoch]))
 
     save_dict = args.save_dict()
@@ -326,6 +225,9 @@ def L2_Distance(tensor1, tensor2, Use_cos = False):
         for i in range(tensor2.shape[0]):
             DownSum2 += tensor2[i].item() * tensor2[i].item()
         DownSum2 = DownSum2 ** 0.5
+
+        if DownSum2 == 0 or DownSum1 == 0:
+            return 0
 
         return abs(1 - UpSum / (DownSum1 * DownSum2))
     else:
@@ -372,16 +274,15 @@ def calculate_relative_similarity(clients_model, global_model, round_clients, ol
     for client_id_l, Client_l in clients_model.items():
         if client_id_l in round_clients:
             client_l_avg_param = avg_deep_param_with_dir(Client_l.ModelStaticDict, global_model.state_dict(), args)
-            # client_l_model_dict = Client_l.ModelStaticDict
+
             for client_id_r, Client_r in clients_model.items():
                 ex_dis = 0
                 client_r_avg_param = avg_deep_param_with_dir(Client_r.ModelStaticDict, global_model.state_dict(), args)
-                if Client_l.InClusterID == Client_r.InClusterID and Client_l.ClientID != Client_r.ClientID:
-                    client_l_pre_param = avg_deep_param_with_dir(Client_l.PreModelStaticDict, global_model.state_dict(), args)
-                    client_r_pre_param = avg_deep_param_with_dir(Client_r.PreModelStaticDict, global_model.state_dict(), args)
-                # client_r_model_dict = Client_r.ModelStaticDict
-                # min_dis = calculate_min_dis(client_l_model_dict, client_r_model_dict, Client_l.PreModelStaticDict, Client_r.PreModelStaticDict, args)
-                    ex_dis = L2_Distance(client_l_pre_param, client_r_pre_param, True)
+                # if Client_l.InClusterID == Client_r.InClusterID and Client_l.ClientID != Client_r.ClientID:
+                #     client_l_pre_param = avg_deep_param_with_dir(Client_l.PreModelStaticDict, global_model.state_dict(), args)
+                #     client_r_pre_param = avg_deep_param_with_dir(Client_r.PreModelStaticDict, global_model.state_dict(), args)
+                #
+                #     ex_dis = L2_Distance(client_l_pre_param, client_r_pre_param, True)
                 all_dis = L2_Distance(client_l_avg_param, client_r_avg_param, True)
                 Dis = abs(ex_dis-all_dis)
                 similarity_matrix[client_id_l][client_id_r] = Dis

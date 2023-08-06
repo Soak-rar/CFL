@@ -23,6 +23,7 @@ class ClientDataInfo:
         self.IsRot = is_rot
         self.Rot = rot
 
+
 class DatasetGen:
     def __init__(self, args: Args.Arguments):
         # 预处理后的数据 列表
@@ -316,6 +317,8 @@ class DatasetGen:
 
         else:
             pass
+
+
 
 if __name__ == '__main__':
     args = Args.Arguments()

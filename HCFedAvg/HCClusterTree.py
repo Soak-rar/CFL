@@ -141,7 +141,7 @@ class HCClusterManager:
                         MinClusterIDPair[0] = Cluster_ID
                         MinClusterIDPair[1] = OtherCluster_ID
 
-            if MinDisBetweenTwoClusters > 0.20:
+            if MinDisBetweenTwoClusters > 0.15:
                 print('  迭代-----------')
                 for cluster_id, cluster in self.CurrentClusters.items():
                     print(cluster_id, "  , ", cluster.Clients)

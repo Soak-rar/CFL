@@ -24,7 +24,6 @@ def train(global_model_dict, datasetLoader, worker_id, device, args: Args.Argume
     local_model.load_state_dict(global_model_dict)
 
     if args.optim == 'Adam':
-
         optimizer = optim.Adam(local_model.parameters(), lr=args.lr)
     else:
         optimizer = optim.SGD(local_model.parameters(), lr=args.lr)
@@ -68,7 +67,7 @@ def main(mArgs):
     train_workers = [i for i in range(mArgs.worker_num)]
 
     # 每个客户端的 局部模型，初始化时为相同的模型
-
+    torch.manual_seed(10)
     global_model = Model.init_model(mArgs.model_name)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() and mArgs.cuda else "cpu")
@@ -82,7 +81,7 @@ def main(mArgs):
     clients_param_update = [None for _ in range(mArgs.worker_num)]
 
     EPS_1 = 0.75
-    EPS_2 = 1.0
+    EPS_2 = 1.58
     warm_round = 20
 
     TotalLoss = []
@@ -152,8 +151,9 @@ def main(mArgs):
         TotalAcc.append(round_acc/len(clusters))
         TotalLoss.append(round_loss/len(clusters))
             # print(cluster_id, "  test")
-        print("loss ", round_acc/len(clusters))
-        print('acc ', round_loss/len(clusters))
+        print()
+        print("acc ", round_acc/len(clusters))
+        print('loss ', round_loss/len(clusters))
 
         # 测试集群模型准确性
     save_dict = mArgs.save_dict()
@@ -164,6 +164,7 @@ def main(mArgs):
     save_dict['acc_list'] = TotalAcc
     save_dict['loss_list'] = TotalLoss
     save_dict['final_cluster_number'] = len(clusters)
+    save_dict['extra_param'] = "EPS_1: " + str(EPS_1) + " , EPS_2: "+ str(EPS_2) + " , Warm_round: " + str(warm_round)
 
     FileProcess.add_row(save_dict)
 
