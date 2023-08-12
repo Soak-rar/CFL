@@ -10,14 +10,14 @@ class Arguments:
         self.save_model = True
         self.global_round = 200
         # 'cifar10'   'mnist'
-        self.dataset_name = 'mnist'
-        self.model_name = "mnist"
+        self.dataset_name = 'cifar10'
+        self.model_name = "AlexNetCIFAR"
         self.dataset_labels_number = 10
         self.worker_num = 100
         self.test_worker_num = 200
         self.worker_train = 10
         self.cluster_worker_train = 2
-        self.deep_model_layer_name = 'fc4.weight'
+        self.deep_model_layer_name = 'classifier.6.weight' #'fc3.weight'
         self.MaxProcessNumber = 3
 
         self.optim = 'Adam' # 'SGD', 'Adam'
@@ -31,9 +31,9 @@ class Arguments:
         self.local_data_classes = 0.4
         # 数据分布
         self.dataset_labels_num = 10
-        self.data_info = {'data_labels': [[0, 1, 2, 3, 4], [1, 2, 3], [5, 6, 7, 8, 9], [6, 7, 8], [0, 4, 5, 9]],
+        self.data_info = {'data_labels': [[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 7], [6, 7, 8, 9], [0, 1, 8, 9]],
                           # [0, 1], [2, 3], [4, 5], [6, 7], [8, 9]
-                          # {0, 1, 2, 3, 4}，{1, 2, 3}，{5, 6, 7, 8, 9}，{6, 7, 8}，{0, 4, 5, 9}
+                          # [[0, 1, 2, 3, 4], [1, 2, 3], [5, 6, 7, 8, 9], [6, 7, 8], [0, 4, 5, 9]]
                           # [[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 7], [6, 7, 8, 9], [0, 1, 8, 9]]
                           'data_rot': [0, 1, 2, 3],
                           'divide_type': 'labels'}# 'rot'
