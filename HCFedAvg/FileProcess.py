@@ -37,7 +37,7 @@ def read_row(row_id):
 
 if __name__ == '__main__':
     args = Args.Arguments()
-    res = read_row(2)
+    res = read_row(5)
     # 将字符串转换为Python列表
     float_list = ast.literal_eval(res['acc_list'])
     # 使用列表推导式将字符串列表转换为浮点数列表
