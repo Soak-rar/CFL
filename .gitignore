@@ -10,7 +10,7 @@
 *.pth
 *.pt
 /data
-/__pycache__
+__pycache__/
 /.idea
 /HCFedAvg/data
 *.pyc
