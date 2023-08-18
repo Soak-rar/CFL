@@ -8,7 +8,7 @@ class Arguments:
         self.local_epochs = 2
         self.lr = 0.0005
         self.save_model = True
-        self.global_round = 2000
+        self.global_round = 200
         # 'cifar10'   'mnist'
         self.dataset_name = 'cifar10'
         if self.dataset_name == 'mnist':

@@ -119,6 +119,7 @@ def main(args):
 
     TotalLoss = []
     TotalAcc = []
+    FinalClusterNumber = []
 
     old_matrix = {}
     for epoch in range(args.global_round):
@@ -195,7 +196,7 @@ def main(args):
                 if i in Cluster.Clients:
                     print(i, end=', ')
             print()
-
+        FinalClusterNumber.append(len(ClusterManager.CurrentClusters))
         TotalLoss.append(np.mean(sorted(epoch_loss, reverse=True)[:5]))
         TotalAcc.append(np.mean(sorted(epoch_acc, reverse=True)[:5]))
         print('acc_list : ', epoch_acc)
@@ -209,7 +210,7 @@ def main(args):
     save_dict['acc_list'] = TotalAcc
     save_dict['loss_list'] = TotalLoss
     save_dict['extra_param'] = "random seed " + str(random_seed)
-    save_dict['final_cluster_number'] = len(ClusterManager.CurrentClusters)
+    save_dict['final_cluster_number'] = FinalClusterNumber
 
     FileProcess.add_row(save_dict)
 
@@ -281,11 +282,6 @@ def calculate_relative_similarity(clients_model, global_model, round_clients, ol
             for client_id_r, Client_r in clients_model.items():
                 ex_dis = 0
                 client_r_avg_param = avg_deep_param_with_dir(Client_r.ModelStaticDict, global_model.state_dict(), args)
-                # if Client_l.InClusterID == Client_r.InClusterID and Client_l.ClientID != Client_r.ClientID:
-                #     client_l_pre_param = avg_deep_param_with_dir(Client_l.PreModelStaticDict, global_model.state_dict(), args)
-                #     client_r_pre_param = avg_deep_param_with_dir(Client_r.PreModelStaticDict, global_model.state_dict(), args)
-                #
-                #     ex_dis = L2_Distance(client_l_pre_param, client_r_pre_param, True)
                 all_dis = L2_Distance(client_l_avg_param, client_r_avg_param, True)
                 Dis = abs(ex_dis-all_dis)
                 similarity_matrix[client_id_l][client_id_r] = Dis
