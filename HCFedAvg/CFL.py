@@ -80,9 +80,9 @@ def main(mArgs):
     clients_param = [None for _ in range(mArgs.worker_num)]
     clients_param_update = [None for _ in range(mArgs.worker_num)]
 
-    EPS_1 = 0.70
-    EPS_2 = 1.58
-    warm_round = 20
+    EPS_1 = 0.33
+    EPS_2 = 1.5
+    warm_round = 0
 
     TotalLoss = []
     TotalAcc = []

@@ -8,17 +8,24 @@ class Arguments:
         self.local_epochs = 2
         self.lr = 0.0005
         self.save_model = True
-        self.global_round = 200
+        self.global_round = 2000
         # 'cifar10'   'mnist'
         self.dataset_name = 'cifar10'
-        self.model_name = "AlexNetCIFAR"
+        if self.dataset_name == 'mnist':
+            self.deep_model_layer_name = 'fc4.weight'
+            self.model_name = "mnist"
+        else:
+            self.deep_model_layer_name = 'fc3.weight'  # 'fc3.weight'
+            self.model_name = "NewCifar10"
         self.dataset_labels_number = 10
         self.worker_num = 100
         self.test_worker_num = 200
         self.worker_train = 10
         self.cluster_worker_train = 2
-        self.deep_model_layer_name = 'classifier.6.weight' #'fc3.weight'
+
         self.MaxProcessNumber = 3
+
+
 
         self.optim = 'Adam' # 'SGD', 'Adam'
 
@@ -32,7 +39,7 @@ class Arguments:
         # 数据分布
         self.dataset_labels_num = 10
         self.data_info = {'data_labels': [[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 7], [6, 7, 8, 9], [0, 1, 8, 9]],
-                          # [0, 1], [2, 3], [4, 5], [6, 7], [8, 9]
+                          # [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]
                           # [[0, 1, 2, 3, 4], [1, 2, 3], [5, 6, 7, 8, 9], [6, 7, 8], [0, 4, 5, 9]]
                           # [[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 7], [6, 7, 8, 9], [0, 1, 8, 9]]
                           'data_rot': [0, 1, 2, 3],

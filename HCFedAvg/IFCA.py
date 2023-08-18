@@ -11,6 +11,7 @@ from sklearn.decomposition import PCA
 from matplotlib import pyplot as plt
 from torch import nn
 from tqdm import tqdm
+from typing import *
 
 from DataGenerater import *
 
@@ -119,7 +120,7 @@ def main(mArgs):
 
     device = torch.device("cuda:0" if torch.cuda.is_available() and args.cuda else "cpu")
 
-    torch.manual_seed(6)
+    torch.manual_seed(4)
     cluster_model_dicts = [Model.init_model(mArgs.model_name).state_dict() for i in range(cluster_num)]
     train_workers = [i for i in range(args.worker_num)]
 
@@ -133,10 +134,12 @@ def main(mArgs):
         for worker_id in tqdm(cluster_clients_train, unit="client"):
             model_dict, in_cluster_id = train(cluster_model_dicts, dataGen.get_client_DataLoader(worker_id), worker_id, device, mArgs)
             cluster_workers[in_cluster_id].append(worker_id)
+
             worker_model_dicts[worker_id] = model_dict
 
-
-        print(cluster_workers)
+        for i, workers in cluster_workers.items():
+            print(i)
+            print(workers)
 
 
         for cluster_id, workers in cluster_workers.items():
@@ -152,33 +155,39 @@ def main(mArgs):
 
         round_acc = 0
         round_loss = 0
+        real_cluster_num = 0
         for cluster_id, cluster_model_dict in enumerate(cluster_model_dicts):
-            new_cluster_id = find_cluster_id(cluster_workers[cluster_id], cluster_num)
-            ClusterDataLoader = dataGen.get_cluster_test_DataLoader(new_cluster_id)
-            cluster_model = Model.init_model(mArgs.model_name)
-            cluster_model.load_state_dict(cluster_model_dict)
-            loss, acc = test(cluster_model, ClusterDataLoader, device)
-            round_acc += acc
-            round_loss += loss
+            if len(cluster_workers[cluster_id]) != 0:
+                real_cluster_num += 1
+                new_cluster_id = find_cluster_id(cluster_workers[cluster_id], cluster_num)
+                ClusterDataLoader = dataGen.get_cluster_test_DataLoader(new_cluster_id)
+                cluster_model = Model.init_model(mArgs.model_name)
+                cluster_model.load_state_dict(cluster_model_dict)
+                loss, acc = test(cluster_model, ClusterDataLoader, device)
+                round_acc += acc
+                round_loss += loss
 
-        TotalAcc.append(round_acc / cluster_num)
-        TotalLoss.append(round_loss / cluster_num)
+        TotalAcc.append(round_acc / real_cluster_num)
+        TotalLoss.append(round_loss / real_cluster_num)
         # print(cluster_id, "  test")
         print()
         print(" epoch :  ", global_round)
-        print("acc ", round_acc / cluster_num)
-        print('loss ', round_loss / cluster_num)
+        print("acc ", round_acc / real_cluster_num)
+        print('loss ', round_loss / real_cluster_num)
 
-
+    cluster_count = 0
+    for cluster_id, workers in cluster_workers.items():
+        if len(workers) != 0:
+            cluster_count += 1
     save_dict = mArgs.save_dict()
     save_dict['algorithm_name'] = 'IFCA'
     save_dict['acc'] = max(TotalAcc)
     save_dict['loss'] = min(TotalLoss)
-    save_dict['traffic'] = 200 * 100 * 5
+    save_dict['traffic'] = 200 * 10 * 5
     save_dict['acc_list'] = TotalAcc
     save_dict['loss_list'] = TotalLoss
-    save_dict['final_cluster_number'] = cluster_num
-    save_dict['extra_param'] = "random select num "
+    save_dict['final_cluster_number'] = cluster_count
+    save_dict['extra_param'] = "random select num " + str(mArgs.worker_train)
 
     FileProcess.add_row(save_dict)
 

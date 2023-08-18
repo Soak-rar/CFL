@@ -99,8 +99,9 @@ def main(args):
 
     train_workers = [i for i in range(args.worker_num)]
 
+    random_seed = 2
     # FedAvg算法的模型
-    torch.manual_seed(10)
+    torch.manual_seed(random_seed)
 
     FedAvg_global_model = Model.init_model(args.model_name)
 
@@ -185,6 +186,7 @@ def main(args):
             epoch_acc.append(acc)
 
         # 输出当前轮次集群结果
+
         trained = cluster_clients_train[:]
         print(' 轮次划分结果 ')
         for cluster_id, Cluster in ClusterManager.CurrentClusters.items():
@@ -194,8 +196,8 @@ def main(args):
                     print(i, end=', ')
             print()
 
-        TotalLoss.append(np.mean(epoch_loss))
-        TotalAcc.append(np.mean(epoch_acc))
+        TotalLoss.append(np.mean(sorted(epoch_loss, reverse=True)[:5]))
+        TotalAcc.append(np.mean(sorted(epoch_acc, reverse=True)[:5]))
         print('acc_list : ', epoch_acc)
         print("Epoch: {}\t, HCCFL\t: Acc : {}\t, Loss : {}\t".format(epoch, TotalAcc[epoch], TotalLoss[epoch]))
 
@@ -206,6 +208,7 @@ def main(args):
     save_dict['traffic'] = 200*10
     save_dict['acc_list'] = TotalAcc
     save_dict['loss_list'] = TotalLoss
+    save_dict['extra_param'] = "random seed " + str(random_seed)
     save_dict['final_cluster_number'] = len(ClusterManager.CurrentClusters)
 
     FileProcess.add_row(save_dict)

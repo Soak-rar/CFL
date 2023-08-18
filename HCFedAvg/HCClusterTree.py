@@ -141,7 +141,7 @@ class HCClusterManager:
                         MinClusterIDPair[0] = Cluster_ID
                         MinClusterIDPair[1] = OtherCluster_ID
 
-            if MinDisBetweenTwoClusters > 0.30:
+            if MinDisBetweenTwoClusters > 0.12:
                 print('  迭代-----------')
                 for cluster_id, cluster in self.CurrentClusters.items():
                     print(cluster_id, "  , ", cluster.Clients)
@@ -181,6 +181,13 @@ class HCClusterManager:
                     if key != MinClusterIDPair[0]:
                         new_dis = calculate_cluster_avg_distance(TempClusters[MinClusterIDPair[0]], value,
                                                                  self.CurrentSimilarityMatrix)
+
+                        # new_dis = calculate_cluster_min_dis(TempClusters[MinClusterIDPair[0]], value,
+                        #                                          self.CurrentSimilarityMatrix)
+                        #
+                        # new_dis = calculate_cluster_max_dis(TempClusters[MinClusterIDPair[0]], value,
+                        #                                          self.CurrentSimilarityMatrix)
+
                         self.ClusterSimilarityMatrix[MinClusterIDPair[0]][key] = new_dis
                         self.ClusterSimilarityMatrix[key][MinClusterIDPair[0]] = new_dis
                 self.CurrentClusters = copy.deepcopy(TempClusters)
@@ -254,3 +261,23 @@ def calculate_cluster_avg_distance(Cluster_A: HCCluster, Cluster_B: HCCluster, s
             DisSum += similarity_matrix[Client_A][Client_B]
 
     return DisSum / (Cluster_A.ClientNumber * Cluster_B.ClientNumber)
+
+
+def calculate_cluster_min_dis(Cluster_A: HCCluster, Cluster_B: HCCluster, similarity_matrix: Dict[int, Dict[int, float]]) -> float:
+    DisMin = 2.0
+    for Client_A in Cluster_A.get_clients_list():
+        for Client_B in Cluster_B.get_clients_list():
+            if similarity_matrix[Client_A][Client_B] < DisMin:
+                DisMin = similarity_matrix[Client_A][Client_B]
+
+    return DisMin
+
+
+def calculate_cluster_max_dis(Cluster_A: HCCluster, Cluster_B: HCCluster, similarity_matrix: Dict[int, Dict[int, float]]) -> float:
+    DisMax = 0.0
+    for Client_A in Cluster_A.get_clients_list():
+        for Client_B in Cluster_B.get_clients_list():
+            if similarity_matrix[Client_A][Client_B] > DisMax:
+                DisMax = similarity_matrix[Client_A][Client_B]
+
+    return DisMax

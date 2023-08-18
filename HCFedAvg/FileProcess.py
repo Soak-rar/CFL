@@ -37,9 +37,10 @@ def read_row(row_id):
 
 if __name__ == '__main__':
     args = Args.Arguments()
-    res = read_row(5)
+    res = read_row(33)
     # 将字符串转换为Python列表
     float_list = ast.literal_eval(res['acc_list'])
+    print(res['acc'])
     # 使用列表推导式将字符串列表转换为浮点数列表
     float_list = [float(x) for x in float_list]
     # print(max(float_list[:200]))
@@ -47,13 +48,13 @@ if __name__ == '__main__':
     print(res['algorithm_name'])
     had = [False, False, False]
     for i, acc in enumerate(float_list):
-        if acc >= 0.95 and had[0] is False:
+        if acc >= 0.80 and had[0] is False:
             had[0] = True
             print(i)
-        if acc >= 0.97 and had[1] is False:
+        if acc >= 0.82 and had[1] is False:
             had[1] = True
             print(i)
-        if acc >= 0.99 and had[2] is False:
+        if acc >= 0.84 and had[2] is False:
             had[2] = True
             print(i)
 
