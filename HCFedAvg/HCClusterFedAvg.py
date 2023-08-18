@@ -120,6 +120,8 @@ def main(args):
     TotalLoss = []
     TotalAcc = []
     FinalClusterNumber = []
+    SimMean = []
+    SimSTD = []
 
     old_matrix = {}
     for epoch in range(args.global_round):
@@ -167,6 +169,12 @@ def main(args):
 
         print("Clustering Time: ", t2-t1)
 
+        # 消融实验
+        mean_, std_ = ClusterManager.calculate_clusters_sd()
+        SimMean.append(mean_)
+        SimSTD.append(std_)
+
+
         # ClusterManager.print_divide_result()
 
         # ClusterManager.UpdateClusterAvgModel(clients_model, cluster_clients_train)
@@ -203,7 +211,7 @@ def main(args):
         print("Epoch: {}\t, HCCFL\t: Acc : {}\t, Loss : {}\t".format(epoch, TotalAcc[epoch], TotalLoss[epoch]))
 
     save_dict = args.save_dict()
-    save_dict['algorithm_name'] = 'HCCFL'
+    save_dict['algorithm_name'] = 'HCCFL_RDS'
     save_dict['acc'] = max(TotalAcc)
     save_dict['loss'] = min(TotalLoss)
     save_dict['traffic'] = 200*10
@@ -211,6 +219,8 @@ def main(args):
     save_dict['loss_list'] = TotalLoss
     save_dict['extra_param'] = "random seed " + str(random_seed)
     save_dict['final_cluster_number'] = FinalClusterNumber
+    save_dict['sim_std'] = SimSTD
+    save_dict['sim_mean'] = SimMean
 
     FileProcess.add_row(save_dict)
 
@@ -284,6 +294,29 @@ def calculate_relative_similarity(clients_model, global_model, round_clients, ol
                 client_r_avg_param = avg_deep_param_with_dir(Client_r.ModelStaticDict, global_model.state_dict(), args)
                 all_dis = L2_Distance(client_l_avg_param, client_r_avg_param, True)
                 Dis = abs(ex_dis-all_dis)
+                similarity_matrix[client_id_l][client_id_r] = Dis
+                similarity_matrix[client_id_r][client_id_l] = Dis
+
+    return similarity_matrix
+
+
+def calculate_similarity(clients_model, global_model, round_clients, old_matrix, args):
+    print('计算相似度')
+    similarity_matrix = {client_id_l: {client_id_r: 0.0 for client_id_r in clients_model.keys()} for client_id_l in
+                         clients_model.keys()}
+    for client_id_l, dis_l_dict in old_matrix.items():
+        for client_id_r, dis_ in dis_l_dict.items():
+            similarity_matrix[client_id_l][client_id_r] = dis_
+
+    for client_id_l, Client_l in clients_model.items():
+        if client_id_l in round_clients:
+            client_l_avg_param = avg_deep_param_with_dir(Client_l.ModelStaticDict, global_model.state_dict(), args)
+            # client_l_model_dict = Client_l.ModelStaticDict
+            for client_id_r, Client_r in clients_model.items():
+                client_r_avg_param = avg_deep_param_with_dir(Client_r.ModelStaticDict, global_model.state_dict(), args)
+                # client_r_model_dict = Client_r.ModelStaticDict
+                # min_dis = calculate_min_dis(client_l_model_dict, client_r_model_dict, Client_l.PreModelStaticDict, Client_r.PreModelStaticDict, args)
+                Dis = L2_Distance(client_l_avg_param, client_r_avg_param, True)
                 similarity_matrix[client_id_l][client_id_r] = Dis
                 similarity_matrix[client_id_r][client_id_l] = Dis
 

@@ -1,6 +1,9 @@
 import math
 from typing import Dict, List
 import copy
+
+import numpy as np
+
 from Args import ClientInServerData
 
 import Model
@@ -145,7 +148,7 @@ class HCClusterManager:
                 print('  迭代-----------')
                 for cluster_id, cluster in self.CurrentClusters.items():
                     print(cluster_id, "  , ", cluster.Clients)
-                self.calculate_clusters_sd()
+                # self.calculate_clusters_sd()
                 break
 
             IsMerge  = False
@@ -226,6 +229,8 @@ class HCClusterManager:
 
     def calculate_clusters_sd(self):
         dict_clients = {}
+        avg_list = []
+        std_list = []
 
         for cluster_id, ClusterClass in self.CurrentClusters.items():
             for client_id in ClusterClass.Clients:
@@ -237,7 +242,11 @@ class HCClusterManager:
         for cluster_id, ClusterClass in self.CurrentClusters.items():
 
             sd_value, avg_value = ClusterClass.calculate_sd(self.CurrentSimilarityMatrix)
+            avg_list.append(avg_value)
+            std_list.append(sd_value)
             print("集群： {}, 标准差： {}, 平均数: {}".format(cluster_id, sd_value, avg_value))
+
+        return np.mean(avg_list), np.mean(std_list)
 
 def init_clusters(HCManager: HCClusterManager, client_number: int):
     for i in range(client_number):

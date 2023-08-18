@@ -40,7 +40,8 @@ def read_row(row_id):
     return selected_row
 
 if __name__ == '__main__':
-    add_new_column('sim_mean')
+
+    # add_new_column('sim_std')
     # args = Args.Arguments()
     # res = read_row(33)
     # # 将字符串转换为Python列表
@@ -62,6 +63,7 @@ if __name__ == '__main__':
     #     if acc >= 0.84 and had[2] is False:
     #         had[2] = True
     #         print(i)
+    pass
 
 
 
