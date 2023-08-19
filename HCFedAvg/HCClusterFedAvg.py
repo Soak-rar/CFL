@@ -128,12 +128,12 @@ def main(args):
 
         cluster_clients_train = random.sample(train_workers, args.worker_train)
 
-        for c in cluster_clients_train:
-            if c in train_workers:
-                train_workers.remove(c)
-
-        if len(train_workers) == 0:
-            train_workers = [i for i in range(args.worker_num)]
+        # for c in cluster_clients_train:
+        #     if c in train_workers:
+        #         train_workers.remove(c)
+        #
+        # if len(train_workers) == 0:
+        #     train_workers = [i for i in range(args.worker_num)]
 
         print(' 参与训练的客户端 ：')
         print(cluster_clients_train)
@@ -153,6 +153,7 @@ def main(args):
             train_info = train(train_model_dict, datasetGen.get_client_DataLoader(worker_id), worker_id, device, args)
             clients_model[worker_id].set_client_info(train_info['model'], train_info['data_len'])
 
+        # global_si_ma = calculate_similarity(clients_model, global_model, cluster_clients_train, old_matrix, args)
         global_si_ma = calculate_relative_similarity(clients_model, global_model, cluster_clients_train, old_matrix, args)
         old_matrix = copy.deepcopy(global_si_ma)
         ClusterManager.reset_similarity_matrix(global_si_ma)

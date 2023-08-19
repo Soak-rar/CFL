@@ -42,10 +42,16 @@ def read_row(row_id):
 if __name__ == '__main__':
 
     # add_new_column('sim_std')
-    # args = Args.Arguments()
-    # res = read_row(33)
-    # # 将字符串转换为Python列表
-    # float_list = ast.literal_eval(res['acc_list'])
+    args = Args.Arguments()
+    res_1 = read_row(35)
+    # 将字符串转换为Python列表
+    float_list_1 = ast.literal_eval(res_1['sim_mean'])
+
+    res_2 = read_row(36)
+    float_list_2 = ast.literal_eval(res_2['sim_mean'])
+    for i in range(len(float_list_1)):
+
+        print(float_list_1[i] - float_list_2[i])
     # print(res['acc'])
     # # 使用列表推导式将字符串列表转换为浮点数列表
     # float_list = [float(x) for x in float_list]
