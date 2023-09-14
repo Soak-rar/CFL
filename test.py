@@ -9,6 +9,7 @@ import pandas
 import threading
 import multiprocessing
 import data.ff
+from HCFedAvg import FileProcess
 from HCFedAvg.DataGenerater import *
 from torchsummary import summary
 import math
@@ -45,16 +46,22 @@ def L2_Distance(tensor1, tensor2, Use_cos = 0):
 
 
 
-def avg_deep_param(model_dict, init_model_dict, args, pre_model_dict=None):
+def avg_deep_param(model_dict, init_model_dict,pre_model_dict=False):
     AvgParam = torch.zeros(model_dict.shape[0])
     for i in range(model_dict.shape[1]):
         for j in range(model_dict.shape[0]):
-            if pre_model_dict is not None:
-                AvgParam[j] = AvgParam[j] + (model_dict[j][i] - pre_model_dict[j][i])
+            if pre_model_dict:
+                AvgParam[j] = AvgParam[j] + (model_dict[j][i])
             else:
-                AvgParam[j] = AvgParam[j] + (model_dict[j][i] - init_model_dict[args.deep_model_layer_name][j][i])
+                AvgParam[j] = AvgParam[j] + (model_dict[j][i] - init_model_dict[j][i])
             # AvgParam[j] = AvgParam[j] + (model_dict[j][i])
     return AvgParam / model_dict.shape[1]
+    # return model_dict[k][:].cpu()
+
+
+def avg_deep_param_bias(model_dict, init_model_dict, args, pre_model_dict=None):
+
+    return model_dict - init_model_dict
     # return model_dict[k][:].cpu()
 
 
@@ -76,24 +83,50 @@ if __name__ == '__main__':
     signal_models_90 = torch.load('HCFedAvg/test_model/signal_model_deep_90.pt')
     args = Args.Arguments()
 
-
-
+    header = {"data": "", "data_type": "", "TAS": [], "COS": []}
+    name = "TAS_result"
     # final_deep = tensor_normal(final_deep)
-
+    header['data'] = args.dataset_name
+    header['data_type'] = args.data_info["data_labels"]
     # final_model = avg_models[-1]
     final_model = signal_models_90[-1]
-    final_deep = avg_deep_param(final_model, init_model, args)
-    dis_list = []
+    final_deep_1 = avg_deep_param(final_model[args.deep_model_layer_name], init_model[args.deep_model_layer_name])
+    final_deep_2 = avg_deep_param(avg_models[95][args.deep_model_layer_name], init_model[args.deep_model_layer_name])
+    final_deep_3 = avg_deep_param(final_model[args.deep_model_layer_name], avg_models[95][args.deep_model_layer_name], True)
+    dis_list_1 = []
+    dis_list_2 = []
     for index, signal_model in enumerate(signal_models_95):
-        deep_ = avg_deep_param(signal_model, init_model, args)
+        deep_1 = avg_deep_param(signal_model[args.deep_model_layer_name], init_model[args.deep_model_layer_name],True)
+        deep_2 = avg_deep_param(avg_models[index * 5][args.deep_model_layer_name], init_model[args.deep_model_layer_name], True)
 
         # deep_ = tensor_normal(deep_)
-        dis_value = L2_Distance(final_deep, deep_)
-        dis_list.append(dis_value)
-    fig = plt.figure(figsize=(24, 6))
-    ax1 = fig.add_subplot(1, 1, 1)
+        dis_value_1 = L2_Distance(final_deep_1, deep_1)
+        dis_value_2 = L2_Distance(final_deep_2, deep_2)
+        dis_list_1.append(abs(dis_value_1-dis_value_2))
 
-    ax1.plot(range(len(dis_list)), dis_list, label="FedAvg")
-    print(dis_list)
+        deep_3 = avg_deep_param(signal_model[args.deep_model_layer_name], avg_models[index * 5][args.deep_model_layer_name], True)
+        dis_value_3 = L2_Distance(final_deep_1, deep_3)
+        dis_list_2.append(dis_value_3)
+
+
+
+    fig = plt.figure(figsize=(24, 12))
+    ax1 = fig.add_subplot(1, 1, 1)
+    header["TAS"] = dis_list_1[::-1]
+    header["COS"] = dis_list_2[::-1]
+
+    # FileProcess.add_row_with_file_name(header, "HCFedAvg/TAS_result")
+    plt.rcParams.update({'font.size': 18})
+    ax1.plot(range(len(dis_list_1)), dis_list_1[::-1], label="TAS")
+    ax1.plot(range(len(dis_list_2)), dis_list_2[::-1], label="COS")
+
+    ax1.legend(loc= 'upper left', prop={'size': 18})
+    plt.xlabel('Time Difference', fontsize=16)
+    plt.ylabel('Similarity Distance', fontsize=16)
+    x_ticks = [i for i in range(21)]
+    x_labels = [str(i) for i in range(21)]
+    plt.xticks(x_ticks, x_labels, fontsize=16)
+    plt.title('Distribution-Cover', fontsize=24)
     plt.show()
+
 

@@ -208,8 +208,10 @@ def compute_max_mean_update_norm(grad_list):
     return torch.max(a.norm(dim=1)).item(), torch.norm(torch.mean(a, dim=0)).item()
 
 def trans_param_to_tensor(model_dict):
+
     parameters = [param.data.view(-1) for param in model_dict.values()]
     m_parameters = torch.cat(parameters)
+
     return m_parameters
 
 def test(model, dataset_loader, device):

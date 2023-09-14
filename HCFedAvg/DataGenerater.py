@@ -194,10 +194,10 @@ class DatasetGen:
             data_list.append(data_[0].numpy())
             label_list.append(label_[0].numpy())
 
-        random.seed(15)
+        random.seed(11)
         random.shuffle(data_list)
 
-        random.seed(15)
+        random.seed(11)
         random.shuffle(label_list)
 
         for data_, label_ in iter(test_data_loader):

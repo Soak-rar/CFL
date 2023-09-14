@@ -16,7 +16,8 @@ import os
 import torch
 import Model
 import time
-
+from sklearn.cluster import KMeans
+from sklearn.cluster import AgglomerativeClustering
 from HCFedAvg import FileProcess
 
 
@@ -123,10 +124,29 @@ def main(args):
     SimMean = []
     SimSTD = []
 
+    ### 加权随机
+    clients_time = [1 for i in range(args.worker_num)]
+
+    ###
+
     old_matrix = {}
     for epoch in range(args.global_round):
 
-        cluster_clients_train = random.sample(train_workers, args.worker_train)
+        ### 加权随机
+        e_weights = [math.pow(math.e, i) for i in clients_time]
+        sum = np.sum(e_weights)
+        e_weights_1 = [i / sum for i in e_weights]
+        cluster_clients_train = np.random.choice(a=train_workers, size=args.worker_train, replace=False, p=e_weights_1)
+
+        for k in train_workers:
+            if k in cluster_clients_train:
+                clients_time[k] = 1
+            else:
+                clients_time[k] += 1
+        ###
+        ## 纯随机
+        # cluster_clients_train = random.sample(train_workers, args.worker_train)
+        ###
 
         # for c in cluster_clients_train:
         #     if c in train_workers:
@@ -155,7 +175,10 @@ def main(args):
 
         # global_si_ma = calculate_similarity(clients_model, global_model, cluster_clients_train, old_matrix, args)
         global_si_ma = calculate_relative_similarity(clients_model, global_model, cluster_clients_train, old_matrix, args)
+        # global_si_ma = calculate_sim_only_cos(clients_model, global_model, cluster_clients_train, old_matrix, args)
+
         old_matrix = copy.deepcopy(global_si_ma)
+
         ClusterManager.reset_similarity_matrix(global_si_ma)
         std_m = []
         td_sm = copy.deepcopy(global_si_ma)
@@ -186,6 +209,8 @@ def main(args):
         epoch_loss = []
         epoch_acc = []
 
+        top_acc = [0 for i in range(args.cluster_number)]
+
         ## 集群准确性测试
         for cluster_id, Cluster in ClusterManager.CurrentClusters.items():
             test_dataloader = datasetGen.get_cluster_test_DataLoader(cluster_id % args.cluster_number)
@@ -194,6 +219,9 @@ def main(args):
             loss, acc = test(test_model, test_dataloader, device)
             epoch_loss.append(loss)
             epoch_acc.append(acc)
+
+            if top_acc[int(cluster_id) % args.cluster_number] < acc:
+                top_acc[int(cluster_id % args.cluster_number)] = acc
 
         # 输出当前轮次集群结果
 
@@ -205,20 +233,23 @@ def main(args):
                 if i in Cluster.Clients:
                     print(i, end=', ')
             print()
+
         FinalClusterNumber.append(len(ClusterManager.CurrentClusters))
         TotalLoss.append(np.mean(sorted(epoch_loss, reverse=True)[:5]))
-        TotalAcc.append(np.mean(sorted(epoch_acc, reverse=True)[:5]))
+        TotalAcc.append(np.mean(top_acc))
         print('acc_list : ', epoch_acc)
+        print("top_acc", top_acc)
+        print("mean_acc", np.mean(top_acc))
         print("Epoch: {}\t, HCCFL\t: Acc : {}\t, Loss : {}\t".format(epoch, TotalAcc[epoch], TotalLoss[epoch]))
 
     save_dict = args.save_dict()
-    save_dict['algorithm_name'] = 'HCCFL_RDS'
+    save_dict['algorithm_name'] = 'HCCFL_时间加权随机'
     save_dict['acc'] = max(TotalAcc)
     save_dict['loss'] = min(TotalLoss)
     save_dict['traffic'] = 200*10
     save_dict['acc_list'] = TotalAcc
     save_dict['loss_list'] = TotalLoss
-    save_dict['extra_param'] = "random seed " + str(random_seed)
+    save_dict['extra_param'] = "random seed " + str(random_seed) + "  pure random"
     save_dict['final_cluster_number'] = FinalClusterNumber
     save_dict['sim_std'] = SimSTD
     save_dict['sim_mean'] = SimMean
@@ -275,6 +306,44 @@ def update_client_similarity_matrix(clients_model: Dict[int, ClientInServerData]
         for client_id_r, Client_r in clients_model.items():
             client_r_avg_param = avg_deep_param(Client_r.PreModelStaticDict, args)
             similarity_matrix[client_id_l][client_id_r] = L2_Distance(client_l_avg_param, client_r_avg_param)
+    return similarity_matrix
+
+
+def trans_param_to_tensor(model_dict):
+
+    parameters = [param.data.view(-1) for param in model_dict.values()]
+    m_parameters = torch.cat(parameters)
+
+    return m_parameters
+
+def dt_matrix(param_list):
+    a = b = torch.stack(param_list, dim=0)
+    a_norm = a / a.norm(dim=1)[:, None]
+    b_norm = b / b.norm(dim=1)[:, None]
+    res = torch.mm(a_norm, b_norm.transpose(0, 1))
+    return res
+
+def calculate_sim_only_cos(clients_model: Dict[int, ClientInServerData], global_model, round_clients, old_matrix, args):
+    print('计算相似度')
+    similarity_matrix = {client_id_l: {client_id_r: 0.0 for client_id_r in clients_model.keys()} for client_id_l in
+                         clients_model.keys()}
+    for client_id_l, dis_l_dict in old_matrix.items():
+        for client_id_r, dis_ in dis_l_dict.items():
+            similarity_matrix[client_id_l][client_id_r] = dis_
+
+
+    for client_id_l, Client_l in clients_model.items():
+        if client_id_l in round_clients:
+            client_l_avg_param = avg_deep_param_with_dir(Client_l.ModelStaticDict, Client_l.PreModelStaticDict, args)
+            # client_l_model_dict = Client_l.ModelStaticDict
+            for client_id_r, Client_r in clients_model.items():
+                client_r_avg_param = avg_deep_param_with_dir(Client_r.ModelStaticDict, Client_r.PreModelStaticDict, args)
+                # client_r_model_dict = Client_r.ModelStaticDict
+                # min_dis = calculate_min_dis(client_l_model_dict, client_r_model_dict, Client_l.PreModelStaticDict, Client_r.PreModelStaticDict, args)
+                Dis = L2_Distance(client_l_avg_param, client_r_avg_param, True)
+                similarity_matrix[client_id_l][client_id_r] = Dis
+                similarity_matrix[client_id_r][client_id_l] = Dis
+
     return similarity_matrix
 
 
@@ -382,6 +451,8 @@ def save(global_test_eval, global_cost, model_dict, args):
     f.write(args.Arg_string)
     f.write('\n' + str(datetime.datetime.now()))
     f.close()
+
+
 
 
 if __name__ == '__main__':

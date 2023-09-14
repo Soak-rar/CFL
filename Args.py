@@ -43,7 +43,8 @@ class Arguments:
                           # [[0, 1, 2, 3, 4], [1, 2, 3], [5, 6, 7, 8, 9], [6, 7, 8], [0, 4, 5, 9]]
                           # [[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 7], [6, 7, 8, 9], [0, 1, 8, 9]]
                           'data_rot': [0, 1, 2, 3],
-                          'divide_type': 'labels'}# 'rot'
+                          'divide_type': 'labels'
+                          }# 'rot'
 
         self.cluster_number = len(self.data_info["data_labels"]) if self.data_info["divide_type"]=="labels" else len(self.data_info["data_rot"])
         self.cuda = True

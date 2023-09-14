@@ -33,18 +33,19 @@ def train(model, train_loader):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
-    for batch_index, (batch_data, batch_label) in enumerate(train_loader):
-        optimizer.zero_grad()
-        batch_data = batch_data.to(device)
-        batch_label = batch_label.to(device)
+    for i in range(2):
+        for batch_index, (batch_data, batch_label) in enumerate(train_loader):
+            optimizer.zero_grad()
+            batch_data = batch_data.to(device)
+            batch_label = batch_label.to(device)
 
-        pred = model(batch_data)
+            pred = model(batch_data)
 
-        loss = F.nll_loss(pred, batch_label)
+            loss = F.nll_loss(pred, batch_label)
 
-        loss.backward()
+            loss.backward()
 
-        optimizer.step()
+            optimizer.step()
 
     # for name, param in model1.named_parameters():
         # print(param.grad)
@@ -114,7 +115,7 @@ def avg(model_dict, local_model_dicts):
 if __name__ == '__main__':
     clister_id = 0
     args = Args.Arguments()
-    torch.random.manual_seed(2)
+    torch.random.manual_seed(3)
     init_model = Model.init_model(args.model_name)
 
     client_list = [i for i in range(0,90,5)]
@@ -127,7 +128,7 @@ if __name__ == '__main__':
     dataGen = HCFedAvg.DataGenerater.DatasetGen(args)
 
     test_data_loader = dataGen.get_cluster_test_DataLoader(clister_id)
-    data_loader_list = [dataGen.get_client_DataLoader(client) for client in client_list]
+    data_loader_list = {client: dataGen.get_client_DataLoader(client) for client in client_list}
     data_loader_95 = dataGen.get_client_DataLoader(95)
     data_loader_90 = dataGen.get_client_DataLoader(90)
 
@@ -141,26 +142,27 @@ if __name__ == '__main__':
     for i in range(100):
         train_clients = random.sample(client_list, 2)
         avg_list = []
-        for client_id, _ in enumerate(train_clients):
-            if is_train[_]:
+        for client_id in train_clients:
+            print(client_id)
+            if is_train[client_id]:
                 model_eval = train(AvgModel, data_loader_list[client_id])
             else:
                 model_eval = train(copy.deepcopy(init_model), data_loader_list[client_id])
-                is_train[_] = True
+                is_train[client_id] = True
 
             avg_list.append(model_eval.state_dict())
         print('epoch: ', i)
 
         AvgModel.load_state_dict(avg(copy.deepcopy(init_model).state_dict(), avg_list))
-        avg_model_deep_list.append(copy.deepcopy(AvgModel.state_dict()[args.deep_model_layer_name]))
+        avg_model_deep_list.append(copy.deepcopy(AvgModel.state_dict()))
         if i % 5 == 0:
             sigal_model = copy.deepcopy(AvgModel)
             train(sigal_model, data_loader_95)
-            signal_model_deep_list_95.append(copy.deepcopy(sigal_model.state_dict()[args.deep_model_layer_name]))
+            signal_model_deep_list_95.append(copy.deepcopy(sigal_model.state_dict()))
 
             sigal_model = copy.deepcopy(AvgModel)
             train(sigal_model, data_loader_90)
-            signal_model_deep_list_90.append(copy.deepcopy(sigal_model.state_dict()[args.deep_model_layer_name]))
+            signal_model_deep_list_90.append(copy.deepcopy(sigal_model.state_dict()))
 
             loss, acc = test(sigal_model, test_data_loader)
             print('signal_model : ', 'acc: ', acc, ' loss', loss)
