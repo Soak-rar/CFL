@@ -8,7 +8,7 @@ class Arguments:
         self.local_epochs = 2
         self.lr = 0.0005
         self.save_model = True
-        self.global_round = 2000
+        self.global_round = 200
         # 'cifar10'   'mnist'
         self.dataset_name = 'cifar10'
         if self.dataset_name == 'mnist':
@@ -38,7 +38,7 @@ class Arguments:
         self.local_data_classes = 0.4
         # 数据分布
         self.dataset_labels_num = 10
-        self.data_info = {'data_labels': [[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 7], [6, 7, 8, 9], [0, 1, 8, 9]],
+        self.data_info = {'data_labels': [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]],
                           # [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]
                           # [[0, 1, 2, 3, 4], [1, 2, 3], [5, 6, 7, 8, 9], [6, 7, 8], [0, 4, 5, 9]]
                           # [[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 7], [6, 7, 8, 9], [0, 1, 8, 9]]
@@ -80,6 +80,23 @@ class Arguments:
                     self.data_info["data_rot"],
                     'acc_list': [],
                     'loss_list': []}
+        return str_dict
+
+    def quant_save_dict(self):
+        str_dict = {
+            "algorithm_name": "",
+            'acc': 0,
+            'loss': 0,
+            "acc_list":[],
+            "loss_list":[],
+            'data_info': self.data_info["data_labels"] if self.data_info["divide_type"] == "labels" else self.data_info["data_rot"],
+            'dataset': self.dataset_name,
+            'model': self.model_name,
+            'batch_size': self.batch_size,
+            'local_epoch': self.local_epochs,
+            'lr': self.lr,
+            'optim': self.optim,
+        }
         return str_dict
 
 

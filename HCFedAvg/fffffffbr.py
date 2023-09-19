@@ -133,19 +133,19 @@ def main(args):
     for epoch in range(args.global_round):
 
         ### 加权随机
-        e_weights = [math.pow(math.e, i) for i in clients_time]
-        sum = np.sum(e_weights)
-        e_weights_1 = [i / sum for i in e_weights]
-        cluster_clients_train = np.random.choice(a=train_workers, size=args.worker_train, replace=False, p=e_weights_1)
-
-        for k in train_workers:
-            if k in cluster_clients_train:
-                clients_time[k] = 1
-            else:
-                clients_time[k] += 1
+        # e_weights = [math.pow(math.e, i) for i in clients_time]
+        # sum = np.sum(e_weights)
+        # e_weights_1 = [i / sum for i in e_weights]
+        # cluster_clients_train = np.random.choice(a=train_workers, size=args.worker_train, replace=False, p=e_weights_1)
+        #
+        # for k in train_workers:
+        #     if k in cluster_clients_train:
+        #         clients_time[k] = 1
+        #     else:
+        #         clients_time[k] += 1
         ###
         ## 纯随机
-        # cluster_clients_train = random.sample(train_workers, args.worker_train)
+        cluster_clients_train = random.sample(train_workers, args.worker_train)
         ###
 
         # for c in cluster_clients_train:
@@ -225,14 +225,14 @@ def main(args):
 
         # 输出当前轮次集群结果
 
-        # trained = cluster_clients_train[:]
-        # print(' 轮次划分结果 ')
-        # for cluster_id, Cluster in ClusterManager.CurrentClusters.items():
-        #     print('cluster_id: ', cluster_id, ' , res: ', end='')
-        #     for i in trained:
-        #         if i in Cluster.Clients:
-        #             print(i, end=', ')
-        #     print()
+        trained = cluster_clients_train[:]
+        print(' 轮次划分结果 ')
+        for cluster_id, Cluster in ClusterManager.CurrentClusters.items():
+            print('cluster_id: ', cluster_id, ' , res: ', end='')
+            for i in trained:
+                if i in Cluster.Clients:
+                    print(i, end=', ')
+            print()
 
         FinalClusterNumber.append(len(ClusterManager.CurrentClusters))
         TotalLoss.append(np.mean(sorted(epoch_loss, reverse=True)[:5]))
@@ -243,7 +243,7 @@ def main(args):
         print("Epoch: {}\t, HCCFL\t: Acc : {}\t, Loss : {}\t".format(epoch, TotalAcc[epoch], TotalLoss[epoch]))
 
     save_dict = args.save_dict()
-    save_dict['algorithm_name'] = 'HCCFL_'
+    save_dict['algorithm_name'] = 'HCCFL_pure'
     save_dict['acc'] = max(TotalAcc)
     save_dict['loss'] = min(TotalLoss)
     save_dict['traffic'] = 200*10

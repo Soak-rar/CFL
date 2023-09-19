@@ -119,6 +119,7 @@ class HCClusterManager:
         self.CurrentClusters: Dict[int, HCCluster] = {}
         self.CurrentSimilarityMatrix: Dict[int, Dict[int, float]] = {}
         self.ClusterSimilarityMatrix: Dict[int, Dict[int, float]] = {}
+        self.H = 0.12
         # init_clusters(self, client_number)
 
     def get_cluster_by_id(self, ClusterID):
@@ -144,7 +145,7 @@ class HCClusterManager:
                         MinClusterIDPair[0] = Cluster_ID
                         MinClusterIDPair[1] = OtherCluster_ID
 
-            if MinDisBetweenTwoClusters > 0.10:
+            if MinDisBetweenTwoClusters > self.H:
                 print('  迭代-----------')
                 for cluster_id, cluster in self.CurrentClusters.items():
                     print(cluster_id, "  , ", cluster.Clients)

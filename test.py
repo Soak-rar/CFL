@@ -108,8 +108,7 @@ if __name__ == '__main__':
         dis_value_3 = L2_Distance(final_deep_1, deep_3)
         dis_list_2.append(dis_value_3)
 
-
-
+    FileProcess.read_row_with_file_name(2,'TAS_result')
     fig = plt.figure(figsize=(24, 12))
     ax1 = fig.add_subplot(1, 1, 1)
     header["TAS"] = dis_list_1[::-1]
