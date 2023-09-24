@@ -1,5 +1,7 @@
 ## 核心思路：指定 K 个集群，每次循环将 K 个集群的模型 全部发送给 参与训练的客户端， 客户端训练 K 个模型，
 ## 并根据 K 模型的损失 将 客户端指定为 损失最小的模型对应的集群中
+import copy
+
 import torch
 from tqdm import tqdm
 from HCFedAvg.DataGenerater import *
@@ -15,6 +17,8 @@ import global_set
 def train(global_model_dict: List, datasetLoader, worker_id, device, args: Args.Arguments):
     local_model = Model.init_model(args.model_name)
     local_model.load_state_dict(global_model_dict)
+
+    pre_dict = copy.deepcopy(global_model_dict)
 
     if args.optim == 'SGD':
         optimizer = optim.Adam(local_model.parameters(), lr=args.lr)
@@ -47,6 +51,14 @@ def train(global_model_dict: List, datasetLoader, worker_id, device, args: Args.
     data_len = batch_num * args.batch_size
     local_model.to('cpu')
     update_model_param = local_model.state_dict()
+
+    print("----------------------------, ", worker_id)
+
+    # for name, param in update_model_param.items():
+    #     print(name)
+    #     print(param - pre_dict[name])
+
+
 
     return local_model, data_len
 
@@ -96,9 +108,9 @@ def main(mArgs):
 
             # print('L2  ',torch.norm(torch.tensor(local_model.Quanter.res), p=2))
             # dequant_model = local_model.dequant()
-            local_model.quant()
-            worker_model_dicts[worker_id] = local_model.dequant()
-            # worker_model_dicts[worker_id] = local_model.state_dict()
+            # local_model.quant()
+            # worker_model_dicts[worker_id] = local_model.dequant()
+            worker_model_dicts[worker_id] = local_model.state_dict()
 
 
             #

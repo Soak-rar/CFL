@@ -100,7 +100,7 @@ def main(args):
 
     train_workers = [i for i in range(args.worker_num)]
 
-    random_seed = 2
+    random_seed = 4
     # FedAvg算法的模型
     torch.manual_seed(random_seed)
 
@@ -130,6 +130,7 @@ def main(args):
     ###
 
     old_matrix = {}
+    current_max_acc = 0
     for epoch in range(args.global_round):
 
         ### 加权随机
@@ -186,7 +187,7 @@ def main(args):
             value.pop(key)
             std_m.extend(value.values())
         std = np.mean(std_m)
-        print('mean: ', std)
+        # print('mean: ', std)
         t1 = time.time()
         ClusterManager.HCClusterDivide()
         t2 = time.time()
@@ -240,7 +241,9 @@ def main(args):
         print('acc_list : ', epoch_acc)
         print("top_acc", top_acc)
         print("mean_acc", np.mean(top_acc))
-        print("Epoch: {}\t, HCCFL\t: Acc : {}\t, Loss : {}\t".format(epoch, TotalAcc[epoch], TotalLoss[epoch]))
+        if TotalAcc[epoch] > current_max_acc:
+            current_max_acc = TotalAcc[epoch]
+        print("Epoch------------------------------------: {}\t, HCCFL\t: Acc : {}\t, Max_Acc : {}\t".format(epoch, TotalAcc[epoch], current_max_acc))
 
     save_dict = args.save_dict()
     save_dict['algorithm_name'] = 'HCCFL_'

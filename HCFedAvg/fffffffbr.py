@@ -100,7 +100,7 @@ def main(args):
 
     train_workers = [i for i in range(args.worker_num)]
 
-    random_seed = 2
+    random_seed = 4
     # FedAvg算法的模型
     torch.manual_seed(random_seed)
 
@@ -130,6 +130,7 @@ def main(args):
     ###
 
     old_matrix = {}
+    current_max_acc = 0
     for epoch in range(args.global_round):
 
         ### 加权随机
@@ -186,12 +187,12 @@ def main(args):
             value.pop(key)
             std_m.extend(value.values())
         std = np.mean(std_m)
-        print('mean: ', std)
+        # print('mean: ', std)
         t1 = time.time()
         ClusterManager.HCClusterDivide()
         t2 = time.time()
 
-        print("Clustering Time: ", t2-t1)
+        # print("Clustering Time: ", t2-t1)
 
         # 消融实验
         mean_, std_ = ClusterManager.calculate_clusters_sd()
@@ -205,7 +206,7 @@ def main(args):
         t1 = time.time()
         ClusterManager.UpdateClusterAvgModelWithTime(clients_model, cluster_clients_train)
         t2 = time.time()
-        print("Avg Time: ", t2 - t1)
+        # print("Avg Time: ", t2 - t1)
         epoch_loss = []
         epoch_acc = []
 
@@ -226,13 +227,13 @@ def main(args):
         # 输出当前轮次集群结果
 
         trained = cluster_clients_train[:]
-        print(' 轮次划分结果 ')
-        for cluster_id, Cluster in ClusterManager.CurrentClusters.items():
-            print('cluster_id: ', cluster_id, ' , res: ', end='')
-            for i in trained:
-                if i in Cluster.Clients:
-                    print(i, end=', ')
-            print()
+        # print(' 轮次划分结果 ')
+        # for cluster_id, Cluster in ClusterManager.CurrentClusters.items():
+        #     print('cluster_id: ', cluster_id, ' , res: ', end='')
+        #     for i in trained:
+        #         if i in Cluster.Clients:
+        #             print(i, end=', ')
+        #     print()
 
         FinalClusterNumber.append(len(ClusterManager.CurrentClusters))
         TotalLoss.append(np.mean(sorted(epoch_loss, reverse=True)[:5]))
@@ -240,7 +241,9 @@ def main(args):
         print('acc_list : ', epoch_acc)
         print("top_acc", top_acc)
         print("mean_acc", np.mean(top_acc))
-        print("Epoch: {}\t, HCCFL\t: Acc : {}\t, Loss : {}\t".format(epoch, TotalAcc[epoch], TotalLoss[epoch]))
+        if TotalAcc[epoch] > current_max_acc:
+            current_max_acc = TotalAcc[epoch]
+        print("Epoch------------------------------------: {}\t, HCCFL\t: Acc : {}\t, Max_Acc : {}\t".format(epoch, TotalAcc[epoch], current_max_acc))
 
     save_dict = args.save_dict()
     save_dict['algorithm_name'] = 'HCCFL_pure'

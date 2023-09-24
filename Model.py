@@ -3,26 +3,81 @@ from typing import *
 import torch.nn as nn
 from torch.nn import functional as F
 import torch
+import math
 
 
 class SpareBinaryQuanter:
-    def __int__(self):
+    def __init__(self):
         self.QuantedModelStateDict:OrderedDict[str, torch.Tensor] = None
         self.DeQuantedModelStateDict:OrderedDict[str, torch.Tensor] = None
-        self.QuantMapDict: Dict[str, float] = None
+
+        self.layers_scale_zero_point = {} # str: [quant_value, bool] true = pos, false = neg
+        self.spare_rate = 0.05
+
+        self.quant_value = 0
+        self.symbol = None
+        self.edge_value = 0
+
+    def set_spare_rate(self, new_spare_rate):
+        self.spare_rate = new_spare_rate
 
     def find_top_positive(self):
 
-    def quant_model(self, mode_state_dict):
         pass
 
+    def init_layers(self, model:nn.Module):
+        for name, module in model.named_parameters():
+            self.layers_scale_zero_point[name] = [0, None]
+
+    def quant_model(self, model_state_dict):
+        self.QuantedModelStateDict = copy.deepcopy(model_state_dict)
+        for name, param in model_state_dict.items():
+            quant_value, _, self.edge_value = self.get_layer_quant_value(copy.deepcopy(param))
+            # print(quant_value, _, self.edge_value)
+
+            self.layers_scale_zero_point[name] = [quant_value, _]
+            self.quant_value = quant_value
+            self.symbol = _
+
+            new_param = param.clone()
+            quanted_param = new_param.map_(new_param, self.quant)
+            self.QuantedModelStateDict[name] = quanted_param
+        return self.QuantedModelStateDict
+
+    def get_layer_quant_value(self, layer_tensor):
+        # 计算每层的 稀疏量化值
+        cat_tensor = layer_tensor.reshape(-1)
+        top_size = math.ceil(cat_tensor.size()[0] * self.spare_rate)
+
+        pos_top_values = torch.topk(cat_tensor, top_size, largest=True)
+        neg_top_values = torch.topk(cat_tensor, top_size, largest=False)
+        # print('------------------')
+        # print(pos_top_values)
+        #
+        # print(neg_top_values)
+        # print('------------------')
+
+        pos_mean = torch.mean(pos_top_values[0])
+        neg_mean = torch.mean(neg_top_values[0])
+
+
+
+        if torch.abs(pos_mean) > torch.abs(neg_mean):
+            return pos_mean, True, torch.min(pos_top_values[0])
+        else:
+            return neg_mean, False, torch.max(neg_top_values[0])
 
     def dequant_model(self):
         pass
 
 
     def quant(self, x, *y):
-        pass
+        if self.symbol and x >= self.edge_value:
+            return self.quant_value
+        elif self.symbol is False and x <= self.edge_value:
+            return self.quant_value
+        else:
+            return 0
 
 
     def dequant(self, x, *y):
@@ -53,7 +108,7 @@ class QuantModelDict:
 
     def init_layers(self, model:nn.Module):
         for name, module in model.named_parameters():
-            self.layers_name.append(name)
+
             self.layers_scale_zero_point[name] = [0, 0]
 
 
@@ -80,7 +135,7 @@ class QuantModelDict:
             new_param = param.clone()
 
             self.layers_scale_zero_point[name] = [self.scale, self.zero_point]
-            quanted_param = new_param.map_(new_param, self.quant_test).to(torch.int8)
+            quanted_param = new_param.map_(new_param, self.quant).to(torch.int8)
             self.QuantedModelStateDict[name] = quanted_param
         return self.QuantedModelStateDict
 
@@ -107,7 +162,6 @@ class QuantModelDict:
 
             for name, param in self.QuantedModelStateDict.items():
                 self.scale, self.zero_point = self.layers_scale_zero_point[name]
-
                 new_param = param.clone().to(torch.float32)
 
                 dequanted_param = new_param.map_(new_param, self.dequant)
@@ -118,17 +172,24 @@ class QuantModelDict:
 class BaseQuantModel(nn.Module):
     def __init__(self):
         super(BaseQuantModel, self).__init__()
-        self.Quanter = QuantModelDict()
+        self.Quanter = None
+
+    def set_quanter(self, Quanter):
+        self.Quanter = Quanter
+        self.Quanter.init_layers(self)
 
     def quant(self):
+        if self.Quanter is not None:
         # 量化模型权重 返回模型字典
-        return self.Quanter.quant_model(self.state_dict())
+            return self.Quanter.quant_model(self.state_dict())
 
     def dequant(self):
-        return self.Quanter.dequant_model(self.state_dict())
+        if self.Quanter is not None:
+            return self.Quanter.dequant_model(self.state_dict())
 
     def quant_test(self):
-        return self.Quanter.quant_model_test(self.state_dict())
+        if self.Quanter is not None:
+            return self.Quanter.quant_model_test(self.state_dict())
 
 
 
@@ -142,7 +203,7 @@ class Cifar10Model(BaseQuantModel):
         self.fc2 = nn.Linear(120, 84)
         self.fc3 = nn.Linear(84, 20)
         self.fc4 = nn.Linear(20, 10)
-        self.Quanter.init_layers(self)
+
 
     def share_memory(self):
         for param in self.parameters():
@@ -168,7 +229,7 @@ class NewCifar10Model(BaseQuantModel):
         self.fc1 = nn.Linear(64 * 4 * 4, 384)
         self.fc2 = nn.Linear(384, 192)
         self.fc3 = nn.Linear(192, 10)
-        self.Quanter.init_layers(self)
+
 
     def share_memory(self):
         for param in self.parameters():
@@ -194,7 +255,6 @@ class MnistModel(BaseQuantModel):
         self.fc3 = nn.Linear(84, 20)
         self.fc4 = nn.Linear(20, 10)
 
-        self.Quanter.init_layers(self)
 
     def share_memory(self):
         for param in self.parameters():

@@ -45,6 +45,11 @@ def add_new_column(column_name):
     df[column_name] = None
     df.to_csv('result.csv', index=False)
 
+def add_new_column_with_file(column_name, file_name):
+    df = pd.read_csv(file_name + '.csv')
+    df[column_name] = None
+    df.to_csv(file_name + '.csv', index=False)
+
 def read_all_rows():
     pass
 
@@ -67,6 +72,7 @@ def read_row_with_file_name(row_id, filename):
 if __name__ == '__main__':
 
     create_file("")
+    add_new_column("extra_param")
 
     # add_new_column('sim_std')
     # args = Args.Arguments()

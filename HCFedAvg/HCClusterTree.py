@@ -119,7 +119,7 @@ class HCClusterManager:
         self.CurrentClusters: Dict[int, HCCluster] = {}
         self.CurrentSimilarityMatrix: Dict[int, Dict[int, float]] = {}
         self.ClusterSimilarityMatrix: Dict[int, Dict[int, float]] = {}
-        self.H = 0.12
+        self.H = 0.165
         # init_clusters(self, client_number)
 
     def get_cluster_by_id(self, ClusterID):
@@ -239,13 +239,13 @@ class HCClusterManager:
 
         print('当前的集群数量： ', len(self.CurrentClusters))
         print('当前的参与过训练的客户端数量： ', len(dict_clients))
-        print("    集群标准差    ")
+        # print("    集群标准差    ")
         for cluster_id, ClusterClass in self.CurrentClusters.items():
 
             sd_value, avg_value = ClusterClass.calculate_sd(self.CurrentSimilarityMatrix)
             avg_list.append(avg_value)
             std_list.append(sd_value)
-            print("集群： {}, 标准差： {}, 平均数: {}".format(cluster_id, sd_value, avg_value))
+            # print("集群： {}, 标准差： {}, 平均数: {}".format(cluster_id, sd_value, avg_value))
 
         return np.mean(avg_list), np.mean(std_list)
 

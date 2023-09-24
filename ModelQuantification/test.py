@@ -5,28 +5,18 @@ import copy
 import Args
 import HCFedAvg.FileProcess as FP
 
-model = Model.init_model('mnist')
 
-pre_dict = copy.deepcopy(model.state_dict())
+init_model = Model.init_model('mnist')
 
-quant_dict = model.quant_test()
-dequant_dict = model.dequant()
+quanter = Model.SpareBinaryQuanter()
+quanter.set_spare_rate(0.1)
 
-scale, zero_point = model.Quanter.layers_scale_zero_point['fc4.bias']
-# res = scale * (q - zero_point)
-res_list = []
-q_list = []
-for value in model.state_dict()['fc4.bias']:
-    q = value.item()
-    q = round(q / scale + zero_point)
-    q_list.append(q)
-    res = scale * (q - zero_point)
-    res_list.append(res)
-print(q_list)
-print(quant_dict['fc4.bias'])
-print(res_list)
-print(model.state_dict()['fc4.bias'])
-print(dequant_dict['fc4.bias'])
-# for name, param in model.state_dict().items():
-#     print(name)
-#     print(param - dequant_dict[name])
+init_model.set_quanter(quanter)
+
+quant_dict = init_model.quant()
+for name, param in quant_dict.items():
+    print(name)
+    print(param)
+# print(copy_dict)
+# for name, param in init_model.named_parameters():
+#     print(param.dtype)
