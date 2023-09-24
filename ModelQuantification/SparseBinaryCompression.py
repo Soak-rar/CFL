@@ -16,11 +16,13 @@ import global_set
 spare_rate = 0.3
 
 def train(global_model_dict, datasetLoader, worker_id,res_model_dict ,device, args: Args.Arguments, use_res = True):
-    if res_model_dict is not None and use_res:
-        for name, parma in global_model_dict.items():
-            global_model_dict[name] = parma + res_model_dict[name]
-    else:
-        res_model_dict = copy.deepcopy(global_model_dict)
+    # if res_model_dict is not None and use_res:
+    #     for name, parma in global_model_dict.items():
+    #         global_model_dict[name] = parma + res_model_dict[name]
+    # else:
+    #     res_model_dict = copy.deepcopy(global_model_dict)
+
+
     quanter = Model.SpareBinaryQuanter()
     quanter.set_spare_rate(spare_rate)
     local_model = Model.init_model(args.model_name)
@@ -69,8 +71,14 @@ def train(global_model_dict, datasetLoader, worker_id,res_model_dict ,device, ar
 
     update_model_dict = copy.deepcopy(new_model_dict)
 
-    for name, param in new_model_dict.items():
-        update_model_dict[name] = new_model_dict[name] - old_model_dict[name]
+    if res_model_dict is not None and use_res:
+        for name, parma in update_model_dict.items():
+            update_model_dict[name] = parma + res_model_dict[name]
+    else:
+        res_model_dict = copy.deepcopy(update_model_dict)
+
+    for name, param in update_model_dict.items():
+        update_model_dict[name] = update_model_dict[name] - old_model_dict[name]
 
     quanted_model_dict = local_model.Quanter.quant_model(update_model_dict)
 
@@ -173,7 +181,7 @@ def main(mArgs):
 
 
     save_dict = mArgs.quant_save_dict()
-    save_dict['algorithm_name'] = 'FedAvg_Quant_Spare_Binary'
+    save_dict['algorithm_name'] = 'FedAvg_Quant_Spare_Binary_right'
     save_dict['acc'] = max(TotalAcc)
     save_dict['loss'] = min(TotalLoss)
     save_dict['acc_list'] = TotalAcc
