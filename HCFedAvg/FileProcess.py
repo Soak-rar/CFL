@@ -71,8 +71,9 @@ def read_row_with_file_name(row_id, filename):
 
 if __name__ == '__main__':
 
-    create_file("")
-    add_new_column("extra_param")
+    # create_file("")
+    # add_new_column("extra_param")
+    add_new_column_with_file("L2", "TAS_result")
 
     # add_new_column('sim_std')
     # args = Args.Arguments()

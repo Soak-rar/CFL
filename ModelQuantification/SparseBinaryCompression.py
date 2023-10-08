@@ -13,7 +13,7 @@ from HCFedAvg import FileProcess
 import global_set
 
 
-spare_rate = 0.3
+spare_rate = 0.1
 
 def train(global_model_dict, datasetLoader, worker_id,res_model_dict ,device, args: Args.Arguments, use_res = True):
     # if res_model_dict is not None and use_res:
@@ -71,19 +71,23 @@ def train(global_model_dict, datasetLoader, worker_id,res_model_dict ,device, ar
 
     update_model_dict = copy.deepcopy(new_model_dict)
 
-    if res_model_dict is not None and use_res:
-        for name, parma in update_model_dict.items():
-            update_model_dict[name] = parma + res_model_dict[name]
-    else:
-        res_model_dict = copy.deepcopy(update_model_dict)
-
     for name, param in update_model_dict.items():
         update_model_dict[name] = update_model_dict[name] - old_model_dict[name]
 
+    if use_res:
+
+        if res_model_dict is not None and use_res:
+            for name, parma in update_model_dict.items():
+                update_model_dict[name] = parma + res_model_dict[name]
+        else:
+            res_model_dict = copy.deepcopy(update_model_dict)
+
     quanted_model_dict = local_model.Quanter.quant_model(update_model_dict)
 
-    for name, param in quanted_model_dict.items():
-        res_model_dict[name] = update_model_dict[name] - quanted_model_dict[name]
+    if use_res:
+        for name, param in quanted_model_dict.items():
+            res_model_dict[name] = update_model_dict[name] - quanted_model_dict[name]
+
 
     print("----------------------------, ", worker_id)
 
@@ -94,6 +98,7 @@ def train(global_model_dict, datasetLoader, worker_id,res_model_dict ,device, ar
 
 
     return quanted_model_dict, data_len, res_model_dict
+
 
 
 def test(model, dataset_loader, device):
@@ -138,7 +143,7 @@ def main(mArgs):
 
         clients_train = random.sample(train_workers, mArgs.worker_train)
         for worker_id in tqdm(clients_train, unit="client", leave=True):
-            local_model, data_len, res_model_dict= train(copy.deepcopy(global_model.state_dict()), dataGen.get_client_DataLoader(worker_id), worker_id,res_model_clients[worker_id], device, mArgs, use_res = True)
+            local_model, data_len, res_model_dict= train(copy.deepcopy(global_model.state_dict()), dataGen.get_client_DataLoader(worker_id), worker_id,res_model_clients[worker_id], device, mArgs, use_res = False)
 
             # print('L2  ',torch.norm(torch.tensor(local_model.Quanter.res), p=2))
             # dequant_model = local_model.dequant()
@@ -181,7 +186,7 @@ def main(mArgs):
 
 
     save_dict = mArgs.quant_save_dict()
-    save_dict['algorithm_name'] = 'FedAvg_Quant_Spare_Binary_right'
+    save_dict['algorithm_name'] = 'FedAvg_Quant_without_res'
     save_dict['acc'] = max(TotalAcc)
     save_dict['loss'] = min(TotalLoss)
     save_dict['acc_list'] = TotalAcc

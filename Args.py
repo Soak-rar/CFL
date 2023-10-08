@@ -6,11 +6,11 @@ class Arguments:
         self.batch_size = 64
         self.test_batch_size = 64
         self.local_epochs = 2
-        self.lr = 0.05
+        self.lr = 0.0005
         self.save_model = True
         self.global_round = 500
         # 'cifar10'   'mnist'
-        self.dataset_name = 'mnist'
+        self.dataset_name = 'cifar10'
         if self.dataset_name == 'mnist':
             self.deep_model_layer_name = 'fc4.weight'
             self.model_name = "mnist"
@@ -38,11 +38,11 @@ class Arguments:
         self.local_data_classes = 0.4
         # 数据分布
         self.dataset_labels_num = 10
-        self.data_info = {'data_labels': [[0, 1,2,3,4,5,6,7,8,9]],
+        self.data_info = {'data_labels': [[0, 1, 2, 3, 4], [1, 2, 3], [5, 6, 7, 8, 9], [6, 7, 8], [0, 4, 5, 9]],
                           # [[0, 1,2,3,4,5,6,7,8,9]]
-                          # [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]
-                          # [[0, 1, 2, 3, 4], [1, 2, 3], [5, 6, 7, 8, 9], [6, 7, 8], [0, 4, 5, 9]]
-                          # [[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 7], [6, 7, 8, 9], [0, 1, 8, 9]]
+                          # Distribution-Parallel     [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]
+                          # Distribution-Cover        [[0, 1, 2, 3, 4], [1, 2, 3], [5, 6, 7, 8, 9], [6, 7, 8], [0, 4, 5, 9]]
+                          # Distribution-Overlapping  [[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 7], [6, 7, 8, 9], [0, 1, 8, 9]]
                           'data_rot': [0, 1, 2, 3],
                           'divide_type': 'labels'
                           }# 'rot'

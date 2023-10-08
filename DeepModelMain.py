@@ -115,7 +115,7 @@ def avg(model_dict, local_model_dicts):
 if __name__ == '__main__':
     clister_id = 0
     args = Args.Arguments()
-    torch.random.manual_seed(3)
+    # torch.random.manual_seed(3)
     init_model = Model.init_model(args.model_name)
 
     client_list = [i for i in range(0,90,5)]

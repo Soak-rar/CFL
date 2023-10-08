@@ -134,19 +134,19 @@ def main(args):
     for epoch in range(args.global_round):
 
         ### 加权随机
-        # e_weights = [math.pow(math.e, i) for i in clients_time]
-        # sum = np.sum(e_weights)
-        # e_weights_1 = [i / sum for i in e_weights]
-        # cluster_clients_train = np.random.choice(a=train_workers, size=args.worker_train, replace=False, p=e_weights_1)
-        #
-        # for k in train_workers:
-        #     if k in cluster_clients_train:
-        #         clients_time[k] = 1
-        #     else:
-        #         clients_time[k] += 1
+        e_weights = [math.pow(math.e, i) for i in clients_time]
+        sum = np.sum(e_weights)
+        e_weights_1 = [i / sum for i in e_weights]
+        cluster_clients_train = np.random.choice(a=train_workers, size=args.worker_train, replace=False, p=e_weights_1)
+
+        for k in train_workers:
+            if k in cluster_clients_train:
+                clients_time[k] = 1
+            else:
+                clients_time[k] += 1
         ###
         ## 纯随机
-        cluster_clients_train = random.sample(train_workers, args.worker_train)
+        # cluster_clients_train = random.sample(train_workers, args.worker_train)
         ###
 
         # for c in cluster_clients_train:
@@ -175,8 +175,8 @@ def main(args):
             clients_model[worker_id].set_client_info(train_info['model'], train_info['data_len'])
 
         # global_si_ma = calculate_similarity(clients_model, global_model, cluster_clients_train, old_matrix, args)
-        global_si_ma = calculate_relative_similarity(clients_model, global_model, cluster_clients_train, old_matrix, args)
-        # global_si_ma = calculate_sim_only_cos(clients_model, global_model, cluster_clients_train, old_matrix, args)
+        # global_si_ma = calculate_relative_similarity_cos(clients_model, cluster_clients_train, old_matrix, args)
+        global_si_ma = calculate_sim_only_cos(clients_model, global_model, cluster_clients_train, old_matrix, args)
 
         old_matrix = copy.deepcopy(global_si_ma)
 
@@ -192,7 +192,7 @@ def main(args):
         ClusterManager.HCClusterDivide()
         t2 = time.time()
 
-        # print("Clustering Time: ", t2-t1)
+        print("Clustering Time: ", t2-t1)
 
         # 消融实验
         mean_, std_ = ClusterManager.calculate_clusters_sd()
@@ -206,7 +206,7 @@ def main(args):
         t1 = time.time()
         ClusterManager.UpdateClusterAvgModelWithTime(clients_model, cluster_clients_train)
         t2 = time.time()
-        # print("Avg Time: ", t2 - t1)
+        print("Avg Time: ", t2 - t1)
         epoch_loss = []
         epoch_acc = []
 
@@ -226,7 +226,7 @@ def main(args):
 
         # 输出当前轮次集群结果
 
-        trained = cluster_clients_train[:]
+        # trained = cluster_clients_train[:]
         # print(' 轮次划分结果 ')
         # for cluster_id, Cluster in ClusterManager.CurrentClusters.items():
         #     print('cluster_id: ', cluster_id, ' , res: ', end='')
@@ -235,18 +235,19 @@ def main(args):
         #             print(i, end=', ')
         #     print()
 
+        sorted_top_acc = sorted(top_acc, reverse= True)[:len(ClusterManager.CurrentClusters)]
         FinalClusterNumber.append(len(ClusterManager.CurrentClusters))
         TotalLoss.append(np.mean(sorted(epoch_loss, reverse=True)[:5]))
-        TotalAcc.append(np.mean(top_acc))
+        TotalAcc.append(np.mean(sorted_top_acc))
         print('acc_list : ', epoch_acc)
-        print("top_acc", top_acc)
-        print("mean_acc", np.mean(top_acc))
+        print("top_acc", sorted_top_acc)
+        print("mean_acc", np.mean(sorted_top_acc))
         if TotalAcc[epoch] > current_max_acc:
             current_max_acc = TotalAcc[epoch]
         print("Epoch------------------------------------: {}\t, HCCFL\t: Acc : {}\t, Max_Acc : {}\t".format(epoch, TotalAcc[epoch], current_max_acc))
 
     save_dict = args.save_dict()
-    save_dict['algorithm_name'] = 'HCCFL_pure'
+    save_dict['algorithm_name'] = 'HCCFL_cos'
     save_dict['acc'] = max(TotalAcc)
     save_dict['loss'] = min(TotalLoss)
     save_dict['traffic'] = 200*10
@@ -260,7 +261,15 @@ def main(args):
     FileProcess.add_row(save_dict)
 
 
-def L2_Distance(tensor1, tensor2, Use_cos = False):
+def L2_Distance(tensor1, tensor2, Use_cos = False, Use_L2 = False):
+
+    if Use_L2:
+        sum_ = 0
+        for i in range(tensor1.shape[0]):
+            sum_ +=  math.pow(tensor1[i].item() - tensor2[i].item(), 2)
+        sum_ = math.pow(sum_, 0.5)
+        return sum_
+
 
     if Use_cos:
         UpSum = 0
@@ -361,14 +370,65 @@ def calculate_relative_similarity(clients_model, global_model, round_clients, ol
     for client_id_l, Client_l in clients_model.items():
         if client_id_l in round_clients:
             client_l_avg_param = avg_deep_param_with_dir(Client_l.ModelStaticDict, global_model.state_dict(), args)
+            client_l_pre_param = avg_deep_param_with_dir(Client_l.PreModelStaticDict, global_model.state_dict(), args)
 
             for client_id_r, Client_r in clients_model.items():
-                ex_dis = 0
+
                 client_r_avg_param = avg_deep_param_with_dir(Client_r.ModelStaticDict, global_model.state_dict(), args)
+                client_r_pre_param = avg_deep_param_with_dir(Client_r.PreModelStaticDict, global_model.state_dict(), args)
+
                 all_dis = L2_Distance(client_l_avg_param, client_r_avg_param, True)
+                ex_dis = L2_Distance(client_l_pre_param, client_r_pre_param, True)
+
                 Dis = abs(ex_dis-all_dis)
                 similarity_matrix[client_id_l][client_id_r] = Dis
                 similarity_matrix[client_id_r][client_id_l] = Dis
+
+    return similarity_matrix
+
+# 使用纯 cos 计算相似度
+def calculate_relative_similarity_cos(clients_model, round_clients, old_matrix, args):
+    print('计算相似度')
+    similarity_matrix = {client_id_l: {client_id_r: 0.0 for client_id_r in clients_model.keys()} for client_id_l in
+                         clients_model.keys()}
+    for client_id_l, dis_l_dict in old_matrix.items():
+        for client_id_r, dis_ in dis_l_dict.items():
+            similarity_matrix[client_id_l][client_id_r] = dis_
+
+    for client_id_l, Client_l in clients_model.items():
+        if client_id_l in round_clients:
+            client_l_avg_param = avg_deep_param(Client_l.ModelStaticDict, args)
+
+            for client_id_r, Client_r in clients_model.items():
+
+                client_r_avg_param = avg_deep_param(Client_r.ModelStaticDict, args)
+                all_dis = L2_Distance(client_l_avg_param, client_r_avg_param, True)
+
+                similarity_matrix[client_id_l][client_id_r] = all_dis
+                similarity_matrix[client_id_r][client_id_l] = all_dis
+
+    return similarity_matrix
+
+# 使用纯 L2 计算相似度
+def calculate_relative_similarity_L2(clients_model, round_clients, old_matrix, args):
+    print('计算相似度')
+    similarity_matrix = {client_id_l: {client_id_r: 0.0 for client_id_r in clients_model.keys()} for client_id_l in
+                         clients_model.keys()}
+    for client_id_l, dis_l_dict in old_matrix.items():
+        for client_id_r, dis_ in dis_l_dict.items():
+            similarity_matrix[client_id_l][client_id_r] = dis_
+
+    for client_id_l, Client_l in clients_model.items():
+        if client_id_l in round_clients:
+            client_l_avg_param = avg_deep_param(Client_l.ModelStaticDict, args)
+
+            for client_id_r, Client_r in clients_model.items():
+
+                client_r_avg_param = avg_deep_param(Client_r.ModelStaticDict, args)
+                all_dis = L2_Distance(client_l_avg_param, client_r_avg_param, False, True)
+
+                similarity_matrix[client_id_l][client_id_r] = all_dis
+                similarity_matrix[client_id_r][client_id_l] = all_dis
 
     return similarity_matrix
 
