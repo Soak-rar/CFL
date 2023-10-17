@@ -119,7 +119,7 @@ class HCClusterManager:
         self.CurrentClusters: Dict[int, HCCluster] = {}
         self.CurrentSimilarityMatrix: Dict[int, Dict[int, float]] = {}
         self.ClusterSimilarityMatrix: Dict[int, Dict[int, float]] = {}
-        self.H = 0.08
+        self.H = 0.165
         # self.H = 0.2
         # init_clusters(self, client_number)
 

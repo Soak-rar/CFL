@@ -175,8 +175,8 @@ def main(args):
             clients_model[worker_id].set_client_info(train_info['model'], train_info['data_len'])
 
         # global_si_ma = calculate_similarity(clients_model, global_model, cluster_clients_train, old_matrix, args)
-        # global_si_ma = calculate_relative_similarity_cos(clients_model, cluster_clients_train, old_matrix, args)
-        global_si_ma = calculate_sim_only_cos(clients_model, global_model, cluster_clients_train, old_matrix, args)
+        global_si_ma = calculate_relative_similarity_L2(clients_model, cluster_clients_train, old_matrix, args)
+        # global_si_ma = calculate_sim_only_cos(clients_model, global_model, cluster_clients_train, old_matrix, args)
 
         old_matrix = copy.deepcopy(global_si_ma)
 

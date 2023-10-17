@@ -13,9 +13,9 @@ from HCFedAvg import FileProcess
 import global_set
 
 
-spare_rate = 0.1
+spare_rate = 0.3
 
-def train(global_model_dict, datasetLoader, worker_id,res_model_dict ,device, args: Args.Arguments, use_res = True):
+def train(global_model_dict, datasetLoader, worker_id,res_model_dict ,device, args: Args.Arguments, client_time,use_res = True):
     # if res_model_dict is not None and use_res:
     #     for name, parma in global_model_dict.items():
     #         global_model_dict[name] = parma + res_model_dict[name]
@@ -74,6 +74,8 @@ def train(global_model_dict, datasetLoader, worker_id,res_model_dict ,device, ar
     for name, param in update_model_dict.items():
         update_model_dict[name] = update_model_dict[name] - old_model_dict[name]
 
+    # return update_model_dict, data_len, res_model_dict
+
     if use_res:
 
         if res_model_dict is not None and use_res:
@@ -128,6 +130,8 @@ def main(mArgs):
 
     torch.manual_seed(5)
 
+    clients_time = [1 for i in range(args.worker_num)]
+
     global_model = Model.init_model(mArgs.model_name)
 
     train_workers = [i for i in range(args.worker_num)]
@@ -137,13 +141,28 @@ def main(mArgs):
 
     res_model_clients = {i: None for i in range(args.worker_num)}
 
+    latest_res = None
+    is_Global_res = None
+
     for global_round in range(mArgs.global_round):
         worker_model_dicts = {}
         worker_data_len = {}
 
         clients_train = random.sample(train_workers, mArgs.worker_train)
+
+        for k in train_workers:
+            if k in clients_train:
+                clients_time[k] = 1
+            else:
+                clients_time[k] += 1
+
         for worker_id in tqdm(clients_train, unit="client", leave=True):
-            local_model, data_len, res_model_dict= train(copy.deepcopy(global_model.state_dict()), dataGen.get_client_DataLoader(worker_id), worker_id,res_model_clients[worker_id], device, mArgs, use_res = False)
+
+
+            local_model, data_len, res_model_dict = train(copy.deepcopy(global_model.state_dict()),
+                                                              dataGen.get_client_DataLoader(worker_id), worker_id,
+                                                              latest_res, device, mArgs,
+                                                              clients_time[worker_id], use_res=True)
 
             # print('L2  ',torch.norm(torch.tensor(local_model.Quanter.res), p=2))
             # dequant_model = local_model.dequant()
@@ -155,11 +174,22 @@ def main(mArgs):
             # worker_model_dicts[worker_id] = local_model.state_dict()
             worker_data_len[worker_id] = data_len
 
+        data_sum = sum(worker_data_len.values())
+
+        if global_round % 5 == 0:
+            if latest_res is None:
+                latest_res = copy.deepcopy(global_model.state_dict())
+            for key in latest_res.keys():
+                latest_res[key] *= 0
+                for client_id in clients_train:
+                    latest_res[key] += worker_model_dicts[client_id][key] * (
+                         worker_data_len[client_id] * 1.0 / data_sum)
+                # print(global_update_dict[key])
 
 
         global_dict = global_model.state_dict()
         global_update_dict = copy.deepcopy(global_dict)
-        data_sum = sum(worker_data_len.values())
+
         for key in global_update_dict.keys():
             global_update_dict[key] *= 0
             for client_id in clients_train:
