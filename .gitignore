@@ -34,3 +34,10 @@ ModelQuantification/data/MNIST/raw/train-labels-idx1-ubyte
 /HCFedAvg/__pycache__/FileProcess.cpython-39.pyc
 /HCFedAvg/__pycache__/HCClusterTree.cpython-39.pyc
 /*.pyc
+convnet_fig.png
+CovModelDrawer.py
+CovModelDrawer.tex
+face_test.py
+test.ipynb
+HCFedAvg/MultiProcessTest.ipynb
+ModelQuantification/plt.ipynb
