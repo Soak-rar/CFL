@@ -30,7 +30,7 @@ ModelQuantification/data/MNIST/raw/train-labels-idx1-ubyte
 *.csv
 *.csv
 *.pyc
-HCFedAvg/__pycache__/DataGenerater.cpython-39.pyc
-HCFedAvg/__pycache__/FileProcess.cpython-39.pyc
-HCFedAvg/__pycache__/HCClusterTree.cpython-39.pyc
-*.pyc
+/HCFedAvg/__pycache__/DataGenerater.cpython-39.pyc
+/HCFedAvg/__pycache__/FileProcess.cpython-39.pyc
+/HCFedAvg/__pycache__/HCClusterTree.cpython-39.pyc
+/*.pyc
