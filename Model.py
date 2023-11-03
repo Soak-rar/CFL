@@ -5,6 +5,9 @@ from torch.nn import functional as F
 import torch
 import math
 
+import Args
+
+args = Args.Arguments()
 
 class SpareBinaryQuanter:
     def __init__(self):
@@ -32,6 +35,9 @@ class SpareBinaryQuanter:
     def quant_model(self, model_state_dict):
         self.QuantedModelStateDict = copy.deepcopy(model_state_dict)
         for name, param in model_state_dict.items():
+
+            if name == args.deep_model_layer_name:
+                continue
             quant_value, _, self.edge_value = self.get_layer_quant_value(copy.deepcopy(param))
             # print(quant_value, _, self.edge_value)
 
