@@ -19,11 +19,23 @@ import time
 from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
 from HCFedAvg import FileProcess
+spare_rate = 0.3
+pre_global_res_update_round = 5
 
+def train(global_model_dict, datasetLoader, worker_id, device, args, res_model_dict=None, use_res = True):
+    # 创建量化器
+    quanter = Model.SpareBinaryQuanter()
+    quanter.set_spare_rate(spare_rate)
 
-def train(global_model_dict, datasetLoader, worker_id, device, args,):
+    # 创建模型
     local_model = Model.init_model(args.model_name)
     local_model.load_state_dict(global_model_dict)
+
+    # 为模型设置量化器
+    local_model.set_quanter(quanter)
+
+    old_model_dict = copy.deepcopy(global_model_dict)
+
     optimizer = optim.Adam(local_model.parameters(), lr=args.lr)
     local_model.train()
     local_model.to(device=device)
@@ -55,11 +67,35 @@ def train(global_model_dict, datasetLoader, worker_id, device, args,):
     # print(avg_loss/count)
     data_len = data_size
     cost = 0
-    # cost += sum([param.nelement() for param in local_model.parameters()])
+
+    new_model_dict = local_model.state_dict()
+
+    update_model_dict = copy.deepcopy(new_model_dict)
+
+    for name, param in update_model_dict.items():
+        update_model_dict[name] = update_model_dict[name] - old_model_dict[name]
+
+    # return update_model_dict, data_len, res_model_dict
+
+    if use_res:
+
+        if res_model_dict is not None and use_res:
+            for name, parma in update_model_dict.items():
+                update_model_dict[name] = parma + res_model_dict[name]
+        else:
+            res_model_dict = copy.deepcopy(update_model_dict)
+
+    quanted_model_dict = local_model.Quanter.quant_model(update_model_dict)
+
+    if use_res:
+        for name, param in quanted_model_dict.items():
+            res_model_dict[name] = update_model_dict[name] - quanted_model_dict[name]
+
     return {'data_len': data_len,
            'id': worker_id,
            'cost': cost * 4,
-           'model':local_model.state_dict()}
+           'quanted_model_update':quanted_model_dict,
+            'res_model_update': res_model_dict}
     # loss, acc = test(model, test_loader, device)
     # q.put()
     # shared_models[worker_id]['model'].load_state_dict(copy.deepcopy(model.state_dict()))
@@ -131,6 +167,9 @@ def main(args):
 
     old_matrix = {}
     current_max_acc = 0
+
+    is_set_cluster_res = False
+    global_res_round = 0
     for epoch in range(args.global_round):
 
         ### 加权随机
@@ -160,22 +199,32 @@ def main(args):
         print(cluster_clients_train)
 
         for i, worker_id in enumerate(cluster_clients_train):
+            res_dict = None
 
             if clients_model.get(worker_id) is None:
-                clients_model[worker_id] = ClientInServerData(worker_id, global_model.state_dict(), worker_id, 1)
+                clients_model[worker_id] = ClientInServerData(worker_id, global_model.state_dict(), worker_id, 0)
                 train_model_dict = global_model.state_dict()
             else:
                 current_cluster = ClusterManager.get_cluster_by_id(clients_model[worker_id].InClusterID)
                 train_model_dict = current_cluster.get_avg_cluster_model_copy()
-                clients_model[worker_id].TrainRound = current_cluster.CurrentModelRound + 1
+
+                if clients_model[worker_id].TrainRound > global_res_round:
+                    res_dict = clients_model[worker_id].LocalResDictUpdate
+                else:
+                    res_dict = current_cluster.get_avg_cluster_res_copy()
+
+                clients_model[worker_id].TrainRound = epoch
 
             clients_model[worker_id].PreModelStaticDict = copy.deepcopy(train_model_dict)
 
-            train_info = train(train_model_dict, datasetGen.get_client_DataLoader(worker_id), worker_id, device, args)
-            clients_model[worker_id].set_client_info(train_info['model'], train_info['data_len'])
+            train_info = train(train_model_dict, datasetGen.get_client_DataLoader(worker_id), worker_id, device, args, res_dict, True)
+
+            local_model = model_add(global_model.state_dict(), train_info['quanted_model_update'])
+
+            clients_model[worker_id].set_client_info(local_model, train_info['data_len'], train_info['res_model_update'])
 
         # global_si_ma = calculate_similarity(clients_model, global_model, cluster_clients_train, old_matrix, args)
-        global_si_ma = calculate_relative_similarity_L2(clients_model, cluster_clients_train, old_matrix, args)
+        global_si_ma = calculate_relative_similarity(clients_model, global_model, cluster_clients_train, old_matrix, args)
         # global_si_ma = calculate_sim_only_cos(clients_model, global_model, cluster_clients_train, old_matrix, args)
 
         old_matrix = copy.deepcopy(global_si_ma)
@@ -204,7 +253,13 @@ def main(args):
 
         # ClusterManager.UpdateClusterAvgModel(clients_model, cluster_clients_train)
         t1 = time.time()
-        ClusterManager.UpdateClusterAvgModelWithTime(clients_model, cluster_clients_train)
+
+        if epoch % pre_global_res_update_round == 0 and epoch != 0:
+            is_set_cluster_res = True
+            global_res_round = epoch
+        else:
+            is_set_cluster_res = False
+        ClusterManager.UpdateClusterAvgModelAndResWithTime(clients_model, is_set_cluster_res)
         t2 = time.time()
         print("Avg Time: ", t2 - t1)
         epoch_loss = []
@@ -247,7 +302,7 @@ def main(args):
         print("Epoch------------------------------------: {}\t, HCCFL\t: Acc : {}\t, Max_Acc : {}\t".format(epoch, TotalAcc[epoch], current_max_acc))
 
     save_dict = args.save_dict()
-    save_dict['algorithm_name'] = 'HCCFL_cos'
+    save_dict['algorithm_name'] = 'HCCFL_res_spare_0.3_res_5'
     save_dict['acc'] = max(TotalAcc)
     save_dict['loss'] = min(TotalLoss)
     save_dict['traffic'] = 200*10
@@ -259,6 +314,13 @@ def main(args):
     save_dict['sim_mean'] = SimMean
 
     FileProcess.add_row(save_dict)
+
+
+def model_add(global_model_dict, add_model_dict):
+    copy_model_dict = copy.deepcopy(global_model_dict)
+    for key in copy_model_dict.keys():
+        copy_model_dict[key] += add_model_dict[key]
+    return copy_model_dict
 
 
 def L2_Distance(tensor1, tensor2, Use_cos = False, Use_L2 = False):
@@ -358,7 +420,7 @@ def calculate_sim_only_cos(clients_model: Dict[int, ClientInServerData], global_
 
     return similarity_matrix
 
-
+# TAS
 def calculate_relative_similarity(clients_model, global_model, round_clients, old_matrix, args):
     print('计算相似度')
     similarity_matrix = {client_id_l: {client_id_r: 0.0 for client_id_r in clients_model.keys()} for client_id_l in

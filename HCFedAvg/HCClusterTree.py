@@ -16,11 +16,31 @@ class HCCluster:
         self.ClientNumber = len(init_clients)
         self.set_max_in_cluster_distance(similarity_matrix)
         self.AvgClusterModelDict = None
+        self.ClusterResDictUpdate = None
         self.CurrentModelRound = 0
 
 
     def get_avg_cluster_model_copy(self):
         return copy.deepcopy(self.AvgClusterModelDict)
+
+    def get_avg_cluster_res_copy(self):
+        return copy.deepcopy(self.ClusterResDictUpdate)
+
+    def set_cluster_res_update(self, clients_model: Dict[int, ClientInServerData], train_clients):
+        if len(train_clients) == 0:
+            return
+        self.ClusterResDictUpdate = copy.deepcopy(clients_model[train_clients[0]].ModelStaticDict)
+
+        total_len = 0
+        if len(train_clients) > 1:
+            for client_id in train_clients:
+                total_len += clients_model[client_id].DataLen
+
+            for key in self.ClusterResDictUpdate.keys():
+                self.ClusterResDictUpdate[key] *= 0
+                for client_id in train_clients:
+                    self.ClusterResDictUpdate[key] += (clients_model[client_id].LocalResDictUpdate[key] * clients_model[
+                        client_id].DataLen / total_len)
 
 
     # 计算当前集群的距离标准差
@@ -119,7 +139,7 @@ class HCClusterManager:
         self.CurrentClusters: Dict[int, HCCluster] = {}
         self.CurrentSimilarityMatrix: Dict[int, Dict[int, float]] = {}
         self.ClusterSimilarityMatrix: Dict[int, Dict[int, float]] = {}
-        self.H = 0.165
+        self.H = 0.11
         # self.H = 0.2
         # init_clusters(self, client_number)
 
@@ -205,12 +225,15 @@ class HCClusterManager:
             train_clients = self.get_last_train_clients(clients_model, Cluster.Clients)
             Cluster.set_avg_cluster_model(clients_model, train_clients)
 
-    def UpdateClusterAvgModelWithTime(self, clients_model: Dict[int, ClientInServerData], cluster_clients_train:[int]):
+    # 设置集群模型 ，如果全局轮次满足条件设置集群残差
+    def UpdateClusterAvgModelAndResWithTime(self, clients_model: Dict[int, ClientInServerData], is_set_res = False):
         for cluster_id, Cluster in self.CurrentClusters.items():
             for client_id in Cluster.Clients:
                 clients_model[client_id].set_client_InClusterID(cluster_id)
             train_clients = self.get_last_train_clients(clients_model, Cluster.Clients)
             Cluster.set_avg_cluster_model_with_time(clients_model,train_clients)
+            if is_set_res:
+                Cluster.set_cluster_res_update(clients_model, train_clients)
 
     def get_last_train_clients(self, clients_model: Dict[int, ClientInServerData], Clients:[int]):
         max_round = 0

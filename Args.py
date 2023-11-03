@@ -6,11 +6,11 @@ class Arguments:
         self.batch_size = 64
         self.test_batch_size = 64
         self.local_epochs = 2
-        self.lr = 0.05
+        self.lr = 0.0005
         self.save_model = True
         self.global_round = 500
         # 'cifar10'   'mnist'
-        self.dataset_name = 'mnist'
+        self.dataset_name = 'cifar10'
         if self.dataset_name == 'mnist':
             self.deep_model_layer_name = 'fc4.weight'
             self.model_name = "mnist"
@@ -27,7 +27,7 @@ class Arguments:
 
 
 
-        self.optim = 'SGD' # 'SGD', 'Adam'
+        self.optim = 'Adam' # 'SGD', 'Adam'
 
         # 每个本地客户端分配的数据数量
         self.local_data_size = 0.4
@@ -38,7 +38,7 @@ class Arguments:
         self.local_data_classes = 0.4
         # 数据分布
         self.dataset_labels_num = 10
-        self.data_info = {'data_labels': [[0,1,2,3,4,5,6,7,8,9]],
+        self.data_info = {'data_labels': [[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 7], [6, 7, 8, 9], [0, 1, 8, 9]],
                           # [[0,1,2,3,4,5,6,7,8,9]]
                           # Distribution-Parallel     [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]
                           # Distribution-Cover        [[0, 1, 2, 3, 4], [1, 2, 3], [5, 6, 7, 8, 9], [6, 7, 8], [0, 4, 5, 9]]
@@ -118,14 +118,16 @@ class ClientInServerData:
         self.InClusterID = inClusterID
         self.ModelStaticDict = ModelDict
         self.PreModelStaticDict = None
+        self.LocalResDictUpdate = None
         self.DataLen = 0
         # 描述当前客户端最新的参与训练的轮次
         self.TrainRound = Round
         self.NumRounds = 0
 
-    def set_client_info(self, ModelDict, DataSize):
+    def set_client_info(self, ModelDict, DataSize, local_res_dict):
         self.ModelStaticDict = copy.deepcopy(ModelDict)
         self.DataLen = DataSize
+        self.LocalResDictUpdate = local_res_dict
 
 
     def set_client_InClusterID(self, ClusterID):

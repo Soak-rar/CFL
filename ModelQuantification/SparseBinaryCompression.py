@@ -15,7 +15,7 @@ import global_set
 
 spare_rate = 0.3
 
-def train(global_model_dict, datasetLoader, worker_id,res_model_dict ,device, args: Args.Arguments, client_time,use_res = True):
+def train(global_model_dict, datasetLoader, worker_id,res_model_dict ,device, args: Args.Arguments,use_res = True):
     # if res_model_dict is not None and use_res:
     #     for name, parma in global_model_dict.items():
     #         global_model_dict[name] = parma + res_model_dict[name]
@@ -183,8 +183,9 @@ def main(mArgs):
             for key in global_res.keys():
                 global_res[key] *= 0
                 for client_id in clients_train:
-                    global_res[key] += worker_model_dicts[client_id][key] * (
+                    global_res[key] += res_model_clients[client_id][key] * (
                          worker_data_len[client_id] * 1.0 / data_sum)
+
                 # print(global_update_dict[key])
             global_res_round = global_round
 
