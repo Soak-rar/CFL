@@ -77,10 +77,10 @@ def tensor_normal(tensor_):
 
 
 if __name__ == '__main__':
-    init_model = torch.load('test_model/init_model_dict.pth')
-    avg_models = torch.load('test_model/avg_model_deep_.pth')
-    signal_models_95 = torch.load('test_model/signal_model_deep_95.pt')
-    signal_models_90 = torch.load('test_model/signal_model_deep_90.pt')
+    init_model = torch.load('HCFedAvg/test_model/init_model_dict.pth')
+    avg_models = torch.load('HCFedAvg/test_model/avg_model_deep_.pth')
+    signal_models_95 = torch.load('HCFedAvg/test_model/signal_model_deep_95.pt')
+    signal_models_90 = torch.load('HCFedAvg/test_model/signal_model_deep_90.pt')
     args = Args.Arguments()
 
     header = {"data": "", "data_type": "", "TAS": [], "COS": []}

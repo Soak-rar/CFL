@@ -121,7 +121,7 @@ if __name__ == '__main__':
     client_list = [i for i in range(0,90,5)]
     print(client_list)
 
-    torch.save(init_model.state_dict(), 'test_model/init_model_dict.pth')
+    torch.save(init_model.state_dict(), 'HCFedAvg/test_model/init_model_dict.pth')
 
     AvgModel = copy.deepcopy(init_model)
 
@@ -172,8 +172,8 @@ if __name__ == '__main__':
         print('avg_model : ', 'acc: ', acc, ' loss', loss)
 
 
-    torch.save(avg_model_deep_list, 'test_model/avg_model_deep_.pth')
-    torch.save(signal_model_deep_list_95, 'test_model/signal_model_deep_95.pt')
-    torch.save(signal_model_deep_list_90, 'test_model/signal_model_deep_90.pt')
+    torch.save(avg_model_deep_list, 'HCFedAvg/test_model/avg_model_deep_.pth')
+    torch.save(signal_model_deep_list_95, 'HCFedAvg/test_model/signal_model_deep_95.pt')
+    torch.save(signal_model_deep_list_90, 'HCFedAvg/test_model/signal_model_deep_90.pt')
 
 

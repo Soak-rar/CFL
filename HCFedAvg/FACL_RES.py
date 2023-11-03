@@ -208,7 +208,7 @@ def main(args):
                 current_cluster = ClusterManager.get_cluster_by_id(clients_model[worker_id].InClusterID)
                 train_model_dict = current_cluster.get_avg_cluster_model_copy()
 
-                if clients_model[worker_id].TrainRound > global_res_round:
+                if clients_model[worker_id].TrainRound >= global_res_round:
                     res_dict = clients_model[worker_id].LocalResDictUpdate
                 else:
                     res_dict = current_cluster.get_avg_cluster_res_copy()
