@@ -15,22 +15,25 @@ import global_set
 
 spare_rate = 0.3
 
-def train(global_model_dict, datasetLoader, worker_id,local_res, global_res ,device, args: Args.Arguments, is_global_res = False, use_res = True):
+def train(global_model_dict, datasetLoader, worker_id,res_model_dict ,device, args: Args.Arguments, client_time,use_res = True):
+    # if res_model_dict is not None and use_res:
+    #     for name, parma in global_model_dict.items():
+    #         global_model_dict[name] = parma + res_model_dict[name]
+    # else:
+    #     res_model_dict = copy.deepcopy(global_model_dict)
 
-    if global_res is not None and use_res and is_global_res:
-        for name, parma in global_model_dict.items():
-            global_model_dict[name] = parma + global_res[name]
-
-
-    quanter = Model.SpareBinaryQuanter()
-    quanter.set_spare_rate(spare_rate)
+    #
+    # quanter = Model.SpareBinaryQuanter()
+    # quanter.set_spare_rate(spare_rate)
     local_model = Model.init_model(args.model_name)
+
+
 
     local_model.load_state_dict(global_model_dict)
 
-    local_model.set_quanter(quanter)
+    # local_model.set_quanter(quanter)
 
-    old_model_dict = copy.deepcopy(global_model_dict)
+    # old_model_dict = copy.deepcopy(global_model_dict)
 
     if args.optim == 'Adam':
         optimizer = optim.Adam(local_model.parameters(), lr=args.lr)
@@ -67,36 +70,36 @@ def train(global_model_dict, datasetLoader, worker_id,local_res, global_res ,dev
     new_model_dict = local_model.state_dict()
 
     update_model_dict = copy.deepcopy(new_model_dict)
+    #
+    # for name, param in update_model_dict.items():
+    #     update_model_dict[name] = update_model_dict[name] - old_model_dict[name]
 
-    for name, param in update_model_dict.items():
-        update_model_dict[name] = new_model_dict[name] - old_model_dict[name]
-
-    # return update_model_dict, data_len, res_model_dict
-
-    if use_res and not is_global_res:
-
-        if local_res is not None:
-            for name, parma in update_model_dict.items():
-                update_model_dict[name] = parma + local_res[name]
-        else:
-            local_res = copy.deepcopy(update_model_dict)
-
-    quanted_model_dict = local_model.Quanter.quant_model(update_model_dict)
-
-    if use_res:
-        for name, param in quanted_model_dict.items():
-            local_res[name] = update_model_dict[name] - quanted_model_dict[name]
-
-
-    print("----------------------------, ", worker_id)
-
-    # for name, param in update_model_param.items():
-    #     print(name)
-    #     print(param - pre_dict[name])
-
-
-
-    return quanted_model_dict, data_len, local_res
+    return update_model_dict, data_len, res_model_dict
+    #
+    # if use_res:
+    #
+    #     if res_model_dict is not None and use_res:
+    #         for name, parma in update_model_dict.items():
+    #             update_model_dict[name] = parma + res_model_dict[name]
+    #     else:
+    #         res_model_dict = copy.deepcopy(update_model_dict)
+    #
+    # quanted_model_dict = local_model.Quanter.quant_model(update_model_dict)
+    #
+    # if use_res:
+    #     for name, param in quanted_model_dict.items():
+    #         res_model_dict[name] = update_model_dict[name] - quanted_model_dict[name]
+    #
+    #
+    # print("----------------------------, ", worker_id)
+    #
+    # # for name, param in update_model_param.items():
+    # #     print(name)
+    # #     print(param - pre_dict[name])
+    #
+    #
+    #
+    # return quanted_model_dict, data_len, res_model_dict
 
 
 
@@ -151,16 +154,11 @@ def main(mArgs):
 
         for worker_id in tqdm(clients_train, unit="client", leave=True):
 
-            if clients_time[worker_id] >= global_res_round:
-                local_model, data_len, res_model_dict = train(copy.deepcopy(global_model.state_dict()),
+            local_model, data_len, res_model_dict = train(copy.deepcopy(global_model.state_dict()),
                                                               dataGen.get_client_DataLoader(worker_id), worker_id,
-                                                              res_model_clients[worker_id], device, mArgs,is_global_res=False,
-                                                              use_res=True)
-            else:
-                local_model, data_len, res_model_dict = train(copy.deepcopy(global_model.state_dict()),
-                                                              dataGen.get_client_DataLoader(worker_id), worker_id,
-                                                              global_res, device, mArgs,is_global_res=True,
-                                                              use_res=True)
+                                                              res_model_clients[worker_id], device, mArgs,
+                                                              clients_time[worker_id], use_res=True)
+
 
             # print('L2  ',torch.norm(torch.tensor(local_model.Quanter.res), p=2))
             # dequant_model = local_model.dequant()
@@ -174,21 +172,6 @@ def main(mArgs):
 
         data_sum = sum(worker_data_len.values())
 
-        if global_round % global_res_update == 0:
-            if global_res is None:
-                global_res = copy.deepcopy(global_model.state_dict())
-            for key in global_res.keys():
-                global_res[key] *= 0
-                for client_id in clients_train:
-                    global_res[key] += res_model_clients[client_id][key] * (
-                         worker_data_len[client_id] * 1.0 / data_sum)
-                # print(global_update_dict[key])
-            global_res_round = global_round
-
-        for k in train_workers:
-            if k in clients_train:
-                clients_time[k] = global_round
-
 
         global_dict = global_model.state_dict()
         global_update_dict = copy.deepcopy(global_dict)
@@ -198,7 +181,7 @@ def main(mArgs):
             for client_id in clients_train:
                 global_update_dict[key] += worker_model_dicts[client_id][key] * (worker_data_len[client_id] * 1.0 / data_sum)
             # print(global_update_dict[key])
-            global_update_dict[key] += global_dict[key]
+
 
 
 
@@ -219,7 +202,7 @@ def main(mArgs):
 
 
     save_dict = mArgs.quant_save_dict()
-    save_dict['algorithm_name'] = 'FedAvg_Quant_without_res'
+    save_dict['algorithm_name'] = 'FedAvg'
     save_dict['acc'] = max(TotalAcc)
     save_dict['loss'] = min(TotalLoss)
     save_dict['acc_list'] = TotalAcc
