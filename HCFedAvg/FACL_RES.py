@@ -208,10 +208,14 @@ def main(args):
                 current_cluster = ClusterManager.get_cluster_by_id(clients_model[worker_id].InClusterID)
                 train_model_dict = current_cluster.get_avg_cluster_model_copy()
 
+                # 如果 本地残差比 全局的新，用本地的， 如果全局残差为空，也用本地的
                 if clients_model[worker_id].TrainRound >= global_res_round:
                     res_dict = clients_model[worker_id].LocalResDictUpdate
                 else:
-                    res_dict = current_cluster.get_avg_cluster_res_copy()
+                    if current_cluster.get_avg_cluster_res_copy() is not None:
+                        res_dict = current_cluster.get_avg_cluster_res_copy()
+                    else:
+                        res_dict = clients_model[worker_id].LocalResDictUpdate
 
                 clients_model[worker_id].TrainRound = epoch
 
@@ -255,11 +259,14 @@ def main(args):
         t1 = time.time()
 
         if epoch % pre_global_res_update_round == 0 and epoch != 0:
-            is_set_cluster_res = True
             global_res_round = epoch
-        else:
-            is_set_cluster_res = False
-        ClusterManager.UpdateClusterAvgModelAndResWithTime(clients_model, is_set_cluster_res)
+            # 更新本地 残差上传到服务端 的 记录
+            for worker_id in cluster_clients_train:
+                clients_model[worker_id].LocalToGlobalResRound = global_res_round
+                clients_model[worker_id].update_global_res()
+
+        # 更新本地 上传到服务端的 残差记录
+        ClusterManager.UpdateClusterAvgModelAndResWithTime(clients_model)
         t2 = time.time()
         print("Avg Time: ", t2 - t1)
         epoch_loss = []

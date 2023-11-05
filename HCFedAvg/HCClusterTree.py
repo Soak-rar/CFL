@@ -31,15 +31,27 @@ class HCCluster:
             return
         self.ClusterResDictUpdate = copy.deepcopy(clients_model[train_clients[0]].ModelStaticDict)
 
+        # 找到 最新的 全局残差，并进行聚合
+
+        max_res_round = 0
+        max_res_clients = []
+
         total_len = 0
         if len(train_clients) > 1:
             for client_id in train_clients:
                 total_len += clients_model[client_id].DataLen
+                if clients_model[client_id].LocalToGlobalResRound > 0:
+                    if clients_model[client_id].LocalToGlobalResRound > max_res_round:
+                        max_res_clients.clear()
+                        max_res_clients.append(client_id)
+                        max_res_round = clients_model[client_id].LocalToGlobalResRound
+                    elif clients_model[client_id].LocalToGlobalResRound == max_res_round:
+                        max_res_clients.append(client_id)
 
             for key in self.ClusterResDictUpdate.keys():
                 self.ClusterResDictUpdate[key] *= 0
-                for client_id in train_clients:
-                    self.ClusterResDictUpdate[key] += (clients_model[client_id].LocalResDictUpdate[key] * clients_model[
+                for client_id in max_res_clients:
+                    self.ClusterResDictUpdate[key] += (clients_model[client_id].LocalToGlobalResDictUpdate[key] * clients_model[
                         client_id].DataLen / total_len)
 
 
@@ -226,14 +238,14 @@ class HCClusterManager:
             Cluster.set_avg_cluster_model(clients_model, train_clients)
 
     # 设置集群模型 ，如果全局轮次满足条件设置集群残差
-    def UpdateClusterAvgModelAndResWithTime(self, clients_model: Dict[int, ClientInServerData], is_set_res = False):
+    def UpdateClusterAvgModelAndResWithTime(self, clients_model: Dict[int, ClientInServerData]):
         for cluster_id, Cluster in self.CurrentClusters.items():
             for client_id in Cluster.Clients:
                 clients_model[client_id].set_client_InClusterID(cluster_id)
             train_clients = self.get_last_train_clients(clients_model, Cluster.Clients)
             Cluster.set_avg_cluster_model_with_time(clients_model,train_clients)
-            if is_set_res:
-                Cluster.set_cluster_res_update(clients_model, train_clients)
+
+            Cluster.set_cluster_res_update(clients_model, Cluster.Clients)
 
     def get_last_train_clients(self, clients_model: Dict[int, ClientInServerData], Clients:[int]):
         max_round = 0

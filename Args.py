@@ -119,6 +119,8 @@ class ClientInServerData:
         self.ModelStaticDict = ModelDict
         self.PreModelStaticDict = None
         self.LocalResDictUpdate = None
+        self.LocalToGlobalResDictUpdate = None
+        self.LocalToGlobalResRound = 0
         self.DataLen = 0
         # 描述当前客户端最新的参与训练的轮次
         self.TrainRound = Round
@@ -132,5 +134,9 @@ class ClientInServerData:
 
     def set_client_InClusterID(self, ClusterID):
         self.InClusterID = ClusterID
+
+
+    def update_global_res(self):
+        self.LocalToGlobalResDictUpdate = copy.deepcopy(self.LocalResDictUpdate)
 
 
