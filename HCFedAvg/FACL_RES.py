@@ -459,12 +459,13 @@ def calculate_relative_similarity(clients_model, global_model, round_clients, ol
             client_l_pre_param = avg_deep_param_with_dir(Client_l.PreModelStaticDict, global_model.state_dict(), args)
 
             for client_id_r, Client_r in clients_model.items():
-
+                ex_dis = 0
                 client_r_avg_param = avg_deep_param_with_dir(Client_r.ModelStaticDict, global_model.state_dict(), args)
                 client_r_pre_param = avg_deep_param_with_dir(Client_r.PreModelStaticDict, global_model.state_dict(), args)
 
                 all_dis = L2_Distance(client_l_avg_param, client_r_avg_param, True)
-                ex_dis = L2_Distance(client_l_pre_param, client_r_pre_param, True)
+                if Client_l.InClusterID == Client_r.InClusterID:
+                    ex_dis = L2_Distance(client_l_pre_param, client_r_pre_param, True)
 
                 Dis = abs(ex_dis-all_dis)
                 similarity_matrix[client_id_l][client_id_r] = Dis
