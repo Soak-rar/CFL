@@ -10,7 +10,7 @@ class Arguments:
         self.save_model = True
         self.global_round = 500
         # 'cifar10'   'mnist'
-        self.dataset_name = 'cifar10'
+        self.dataset_name = 'mnist'
         if self.dataset_name == 'mnist':
             self.deep_model_layer_name = 'fc4.weight'
             self.model_name = "mnist"

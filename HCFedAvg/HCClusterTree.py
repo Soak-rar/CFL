@@ -238,14 +238,14 @@ class HCClusterManager:
             Cluster.set_avg_cluster_model(clients_model, train_clients)
 
     # 设置集群模型 ，如果全局轮次满足条件设置集群残差
-    def UpdateClusterAvgModelAndResWithTime(self, clients_model: Dict[int, ClientInServerData]):
+    def UpdateClusterAvgModelAndResWithTime(self, clients_model: Dict[int, ClientInServerData], use_quant = True):
         for cluster_id, Cluster in self.CurrentClusters.items():
             for client_id in Cluster.Clients:
                 clients_model[client_id].set_client_InClusterID(cluster_id)
             train_clients = self.get_last_train_clients(clients_model, Cluster.Clients)
             Cluster.set_avg_cluster_model_with_time(clients_model,train_clients)
-
-            Cluster.set_cluster_res_update(clients_model, Cluster.Clients)
+            if use_quant:
+                Cluster.set_cluster_res_update(clients_model, Cluster.Clients)
 
     def get_last_train_clients(self, clients_model: Dict[int, ClientInServerData], Clients:[int]):
         max_round = 0

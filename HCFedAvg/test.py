@@ -77,10 +77,10 @@ def tensor_normal(tensor_):
 
 
 if __name__ == '__main__':
-    init_model = torch.load('HCFedAvg/test_model/init_model_dict.pth')
-    avg_models = torch.load('HCFedAvg/test_model/avg_model_deep_.pth')
-    signal_models_95 = torch.load('HCFedAvg/test_model/signal_model_deep_95.pt')
-    signal_models_90 = torch.load('HCFedAvg/test_model/signal_model_deep_90.pt')
+    init_model = torch.load('test_model/init_model_dict.pth')
+    avg_models = torch.load('test_model/avg_model_deep_.pth')
+    signal_models_95 = torch.load('test_model/signal_model_deep_95.pt')
+    signal_models_90 = torch.load('test_model/signal_model_deep_90.pt')
     args = Args.Arguments()
 
     header = {"data": "", "data_type": "", "TAS": [], "COS": []}
@@ -90,25 +90,57 @@ if __name__ == '__main__':
     header['data_type'] = args.data_info["data_labels"]
     # final_model = avg_models[-1]
     final_model = signal_models_90[-1]
-    final_deep_1 = avg_deep_param(final_model[args.deep_model_layer_name], init_model[args.deep_model_layer_name])
-    final_deep_2 = avg_deep_param(avg_models[95][args.deep_model_layer_name], init_model[args.deep_model_layer_name])
-    final_deep_3 = avg_deep_param(final_model[args.deep_model_layer_name], avg_models[95][args.deep_model_layer_name], True)
 
-    final_deep_4 = avg_deep_param(final_model[args.deep_model_layer_name], init_model[args.deep_model_layer_name], True)
+
+    # final_deep_1 = avg_deep_param(final_model[args.deep_model_layer_name], init_model[args.deep_model_layer_name])
+    # final_deep_2 = avg_deep_param(avg_models[95][args.deep_model_layer_name], init_model[args.deep_model_layer_name])
+    # final_deep_3 = avg_deep_param(final_model[args.deep_model_layer_name], avg_models[95][args.deep_model_layer_name], True)
+    #
+    # final_deep_4 = avg_deep_param(final_model[args.deep_model_layer_name], init_model[args.deep_model_layer_name], True)
+
+
+    quanter = Model.SpareBinaryQuanter()
+    quanter.set_spare_rate(0.3)
+
+    final_model_quant = quanter.quant_layer(final_model[args.deep_model_layer_name])
+    init_model_quant = quanter.quant_layer(init_model[args.deep_model_layer_name])
+    avg_model_quant = quanter.quant_layer(avg_models[95][args.deep_model_layer_name])
+    final_deep_1 = avg_deep_param(final_model_quant, init_model_quant)
+    final_deep_2 = avg_deep_param(avg_model_quant, init_model_quant)
+    final_deep_3 = avg_deep_param(final_model_quant, avg_model_quant, True)
+    final_deep_4 = avg_deep_param(final_model_quant, init_model_quant, True)
 
     dis_list_1 = []
     dis_list_2 = []
     dis_list_3 = []
     for index, signal_model in enumerate(signal_models_95):
-        deep_1 = avg_deep_param(signal_model[args.deep_model_layer_name], init_model[args.deep_model_layer_name])
-        deep_2 = avg_deep_param(avg_models[index * 5][args.deep_model_layer_name], init_model[args.deep_model_layer_name])
+        # deep_1 = avg_deep_param(signal_model[args.deep_model_layer_name], init_model[args.deep_model_layer_name])
+        # deep_2 = avg_deep_param(avg_models[index * 5][args.deep_model_layer_name], init_model[args.deep_model_layer_name])
+        #
+        # # deep_ = tensor_normal(deep_)
+        # dis_value_1 = L2_Distance(final_deep_1, deep_1)
+        # dis_value_2 = L2_Distance(final_deep_2, deep_2)
+        # dis_list_1.append(abs(dis_value_1-dis_value_2))
+        #
+        # deep_3 = avg_deep_param(signal_model[args.deep_model_layer_name], avg_models[index * 5][args.deep_model_layer_name], True)
+        # dis_value_3 = L2_Distance(final_deep_4, deep_3)
+        # dis_list_2.append(dis_value_3)
+        #
+        # dis_value_4 = L2_Distance(final_deep_4, deep_3, Use_cos=1)
+        # dis_list_3.append(dis_value_4)
+        #
+        # 量化后相似度计算
+        deep_1 = avg_deep_param(quanter.quant_layer(signal_model[args.deep_model_layer_name]), quanter.quant_layer(init_model[args.deep_model_layer_name]))
+        deep_2 = avg_deep_param(quanter.quant_layer(avg_models[index * 5][args.deep_model_layer_name]), quanter.quant_layer(init_model[args.deep_model_layer_name]))
 
         # deep_ = tensor_normal(deep_)
         dis_value_1 = L2_Distance(final_deep_1, deep_1)
         dis_value_2 = L2_Distance(final_deep_2, deep_2)
         dis_list_1.append(abs(dis_value_1-dis_value_2))
 
-        deep_3 = avg_deep_param(signal_model[args.deep_model_layer_name], avg_models[index * 5][args.deep_model_layer_name], True)
+        deep_3 = avg_deep_param(quanter.quant_layer(signal_model[args.deep_model_layer_name]), quanter.quant_layer(avg_models[index * 5][args.deep_model_layer_name]), True)
+
+
         dis_value_3 = L2_Distance(final_deep_4, deep_3)
         dis_list_2.append(dis_value_3)
 

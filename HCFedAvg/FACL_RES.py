@@ -22,17 +22,19 @@ from HCFedAvg import FileProcess
 spare_rate = 0.3
 pre_global_res_update_round = 5
 
-def train(global_model_dict, datasetLoader, worker_id, device, args, res_model_dict=None, use_res = True):
+def train(global_model_dict, datasetLoader, worker_id, device, args, res_model_dict=None, use_res = True, is_quant = True):
     # 创建量化器
-    quanter = Model.SpareBinaryQuanter()
-    quanter.set_spare_rate(spare_rate)
+    if is_quant:
+        quanter = Model.SpareBinaryQuanter()
+        quanter.set_spare_rate(spare_rate)
 
     # 创建模型
     local_model = Model.init_model(args.model_name)
     local_model.load_state_dict(global_model_dict)
 
     # 为模型设置量化器
-    local_model.set_quanter(quanter)
+    if is_quant:
+        local_model.set_quanter(quanter)
 
     old_model_dict = copy.deepcopy(global_model_dict)
 
@@ -76,26 +78,34 @@ def train(global_model_dict, datasetLoader, worker_id, device, args, res_model_d
         update_model_dict[name] = update_model_dict[name] - old_model_dict[name]
 
     # return update_model_dict, data_len, res_model_dict
+    if is_quant:
+        if use_res:
 
-    if use_res:
+            if res_model_dict is not None and use_res:
+                for name, parma in update_model_dict.items():
+                    update_model_dict[name] = parma + res_model_dict[name]
+            else:
+                res_model_dict = copy.deepcopy(update_model_dict)
 
-        if res_model_dict is not None and use_res:
-            for name, parma in update_model_dict.items():
-                update_model_dict[name] = parma + res_model_dict[name]
-        else:
-            res_model_dict = copy.deepcopy(update_model_dict)
+        quanted_model_dict = local_model.Quanter.quant_model(update_model_dict)
 
-    quanted_model_dict = local_model.Quanter.quant_model(update_model_dict)
+        if use_res:
+            for name, param in quanted_model_dict.items():
+                res_model_dict[name] = update_model_dict[name] - quanted_model_dict[name]
 
-    if use_res:
-        for name, param in quanted_model_dict.items():
-            res_model_dict[name] = update_model_dict[name] - quanted_model_dict[name]
+        return {'data_len': data_len,
+               'id': worker_id,
+               'cost': cost * 4,
+               'quanted_model_update':quanted_model_dict,
+                'res_model_update': res_model_dict,
+                'model_update': None}
 
     return {'data_len': data_len,
-           'id': worker_id,
-           'cost': cost * 4,
-           'quanted_model_update':quanted_model_dict,
-            'res_model_update': res_model_dict}
+               'id': worker_id,
+               'cost': cost * 4,
+               'quanted_model_update':None,
+                'res_model_update': res_model_dict,
+                'model_update': update_model_dict}
     # loss, acc = test(model, test_loader, device)
     # q.put()
     # shared_models[worker_id]['model'].load_state_dict(copy.deepcopy(model.state_dict()))
@@ -170,6 +180,8 @@ def main(args):
 
     is_set_cluster_res = False
     global_res_round = 0
+
+    is_quant = False
     for epoch in range(args.global_round):
 
         ### 加权随机
@@ -209,21 +221,25 @@ def main(args):
                 train_model_dict = current_cluster.get_avg_cluster_model_copy()
 
                 # 如果 本地残差比 全局的新，用本地的， 如果全局残差为空，也用本地的
-                if clients_model[worker_id].TrainRound >= global_res_round:
-                    res_dict = clients_model[worker_id].LocalResDictUpdate
-                else:
-                    if current_cluster.get_avg_cluster_res_copy() is not None:
-                        res_dict = current_cluster.get_avg_cluster_res_copy()
-                    else:
+                if is_quant:
+                    if clients_model[worker_id].TrainRound >= global_res_round:
                         res_dict = clients_model[worker_id].LocalResDictUpdate
+                    else:
+                        if current_cluster.get_avg_cluster_res_copy() is not None:
+                            res_dict = current_cluster.get_avg_cluster_res_copy()
+                        else:
+                            res_dict = clients_model[worker_id].LocalResDictUpdate
 
                 clients_model[worker_id].TrainRound = epoch
 
             clients_model[worker_id].PreModelStaticDict = copy.deepcopy(train_model_dict)
 
-            train_info = train(train_model_dict, datasetGen.get_client_DataLoader(worker_id), worker_id, device, args, res_dict, True)
+            train_info = train(train_model_dict, datasetGen.get_client_DataLoader(worker_id), worker_id, device, args, res_dict, True, is_quant)
 
-            local_model = model_add(global_model.state_dict(), train_info['quanted_model_update'])
+            if is_quant:
+                local_model = model_add(global_model.state_dict(), train_info['quanted_model_update'])
+            else:
+                local_model = model_add(global_model.state_dict(), train_info['model_update'])
 
             clients_model[worker_id].set_client_info(local_model, train_info['data_len'], train_info['res_model_update'])
 
@@ -234,12 +250,12 @@ def main(args):
         old_matrix = copy.deepcopy(global_si_ma)
 
         ClusterManager.reset_similarity_matrix(global_si_ma)
-        std_m = []
-        td_sm = copy.deepcopy(global_si_ma)
-        for key, value in td_sm.items():
-            value.pop(key)
-            std_m.extend(value.values())
-        std = np.mean(std_m)
+        # std_m = []
+        # td_sm = copy.deepcopy(global_si_ma)
+        # for key, value in td_sm.items():
+        #     value.pop(key)
+        #     std_m.extend(value.values())
+        # std = np.mean(std_m)
         # print('mean: ', std)
         t1 = time.time()
         ClusterManager.HCClusterDivide()
@@ -258,15 +274,16 @@ def main(args):
         # ClusterManager.UpdateClusterAvgModel(clients_model, cluster_clients_train)
         t1 = time.time()
 
-        if epoch % pre_global_res_update_round == 0 and epoch != 0:
-            global_res_round = epoch
-            # 更新本地 残差上传到服务端 的 记录
-            for worker_id in cluster_clients_train:
-                clients_model[worker_id].LocalToGlobalResRound = global_res_round
-                clients_model[worker_id].update_global_res()
+        if is_quant:
+            if epoch % pre_global_res_update_round == 0 and epoch != 0:
+                global_res_round = epoch
+                # 更新本地 残差上传到服务端 的 记录
+                for worker_id in cluster_clients_train:
+                    clients_model[worker_id].LocalToGlobalResRound = global_res_round
+                    clients_model[worker_id].update_global_res()
 
         # 更新本地 上传到服务端的 残差记录
-        ClusterManager.UpdateClusterAvgModelAndResWithTime(clients_model)
+        ClusterManager.UpdateClusterAvgModelAndResWithTime(clients_model, is_quant)
         t2 = time.time()
         print("Avg Time: ", t2 - t1)
         epoch_loss = []

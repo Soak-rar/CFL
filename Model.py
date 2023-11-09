@@ -32,6 +32,17 @@ class SpareBinaryQuanter:
         for name, module in model.named_parameters():
             self.layers_scale_zero_point[name] = [0, None]
 
+
+    def quant_layer(self, layer_param):
+        quant_value, _, self.edge_value = self.get_layer_quant_value(copy.deepcopy(layer_param))
+        # print(quant_value, _, self.edge_value)
+        self.quant_value = quant_value
+        self.symbol = _
+
+        new_param = layer_param.clone()
+        quanted_param = new_param.map_(new_param, self.quant)
+        return quanted_param
+
     def quant_model(self, model_state_dict):
         self.QuantedModelStateDict = copy.deepcopy(model_state_dict)
         for name, param in model_state_dict.items():
@@ -46,7 +57,7 @@ class SpareBinaryQuanter:
             self.symbol = _
 
             new_param = param.clone()
-            quanted_param = new_param.map_(new_param, self.quant)
+            quanted_param = new_param.map_(new_param, self.spare)
             self.QuantedModelStateDict[name] = quanted_param
         return self.QuantedModelStateDict
 
@@ -82,6 +93,15 @@ class SpareBinaryQuanter:
             return self.quant_value
         elif self.symbol is False and x <= self.edge_value:
             return self.quant_value
+        else:
+            return 0
+
+
+    def spare(self, x, *y):
+        if self.symbol and x >= self.edge_value:
+            return x
+        elif self.symbol is False and x <= self.edge_value:
+            return x
         else:
             return 0
 
