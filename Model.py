@@ -57,7 +57,7 @@ class SpareBinaryQuanter:
             self.symbol = _
 
             new_param = param.clone()
-            quanted_param = new_param.map_(new_param, self.spare)
+            quanted_param = new_param.map_(new_param, self.quant)
             self.QuantedModelStateDict[name] = quanted_param
         return self.QuantedModelStateDict
 
@@ -289,11 +289,11 @@ class MnistModel(BaseQuantModel):
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
-        # x = F.max_pool2d(x, 2, 2)
-        x= self.pool(x)
+        x = F.max_pool2d(x, 2, 2)
+        # x= self.pool(x)
         x = F.relu(self.conv2(x))
-        # x = F.max_pool2d(x, 2, 2)
-        x = self.pool(x)
+        x = F.max_pool2d(x, 2, 2)
+        # x = self.pool(x)
         x = x.view(-1, 4 * 4 * 50)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))

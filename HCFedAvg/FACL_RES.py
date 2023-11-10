@@ -105,7 +105,8 @@ def train(global_model_dict, datasetLoader, worker_id, device, args, res_model_d
                'cost': cost * 4,
                'quanted_model_update':None,
                 'res_model_update': res_model_dict,
-                'model_update': update_model_dict}
+                'model_update': update_model_dict,
+                'model': new_model_dict}
     # loss, acc = test(model, test_loader, device)
     # q.put()
     # shared_models[worker_id]['model'].load_state_dict(copy.deepcopy(model.state_dict()))
@@ -146,7 +147,7 @@ def main(args):
 
     train_workers = [i for i in range(args.worker_num)]
 
-    random_seed = 4
+    random_seed = 2
     # FedAvg算法的模型
     torch.manual_seed(random_seed)
 
@@ -181,7 +182,7 @@ def main(args):
     is_set_cluster_res = False
     global_res_round = 0
 
-    is_quant = False
+    is_quant = True
     for epoch in range(args.global_round):
 
         ### 加权随机
@@ -237,9 +238,9 @@ def main(args):
             train_info = train(train_model_dict, datasetGen.get_client_DataLoader(worker_id), worker_id, device, args, res_dict, True, is_quant)
 
             if is_quant:
-                local_model = model_add(global_model.state_dict(), train_info['quanted_model_update'])
+                local_model = model_add(train_model_dict, train_info['quanted_model_update'])
             else:
-                local_model = model_add(global_model.state_dict(), train_info['model_update'])
+                local_model = model_add(train_model_dict, train_info['model_update'])
 
             clients_model[worker_id].set_client_info(local_model, train_info['data_len'], train_info['res_model_update'])
 
@@ -295,7 +296,7 @@ def main(args):
         for cluster_id, Cluster in ClusterManager.CurrentClusters.items():
             test_dataloader = datasetGen.get_cluster_test_DataLoader(cluster_id % args.cluster_number)
             test_model = Model.init_model(args.model_name)
-            test_model.load_state_dict(Cluster.AvgClusterModelDict)
+            test_model.load_state_dict(Cluster.get_avg_cluster_model_copy())
             loss, acc = test(test_model, test_dataloader, device)
             epoch_loss.append(loss)
             epoch_acc.append(acc)
