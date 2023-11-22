@@ -18,6 +18,7 @@ class HCCluster:
         self.AvgClusterModelDict = None
         self.ClusterResDictUpdate = None
         self.CurrentModelRound = 0
+        self.GlobalResRound = 0
 
 
     def get_avg_cluster_model_copy(self):
@@ -47,7 +48,7 @@ class HCCluster:
                         max_res_round = clients_model[client_id].LocalToGlobalResRound
                     elif clients_model[client_id].LocalToGlobalResRound == max_res_round:
                         max_res_clients.append(client_id)
-
+            self.GlobalResRound = max_res_round
             for key in self.ClusterResDictUpdate.keys():
                 self.ClusterResDictUpdate[key] *= 0
                 for client_id in max_res_clients:
@@ -151,7 +152,7 @@ class HCClusterManager:
         self.CurrentClusters: Dict[int, HCCluster] = {}
         self.CurrentSimilarityMatrix: Dict[int, Dict[int, float]] = {}
         self.ClusterSimilarityMatrix: Dict[int, Dict[int, float]] = {}
-        self.H = 0.10
+        self.H = 0.05
         # self.H = 0.2
         # init_clusters(self, client_number)
 

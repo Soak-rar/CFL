@@ -13,7 +13,7 @@ from HCFedAvg import FileProcess
 import global_set
 
 
-spare_rate = 0.3
+spare_rate = 0.005
 
 def train(global_model_dict, datasetLoader, worker_id,res_model_dict ,device, args: Args.Arguments,use_res = True):
     # if res_model_dict is not None and use_res:
@@ -23,7 +23,7 @@ def train(global_model_dict, datasetLoader, worker_id,res_model_dict ,device, ar
     #     res_model_dict = copy.deepcopy(global_model_dict)
 
 
-    quanter = Model.SpareBinaryQuanter()
+    quanter = Model.STPandNQuanter()
     quanter.set_spare_rate(spare_rate)
     local_model = Model.init_model(args.model_name)
 
@@ -145,6 +145,7 @@ def main(mArgs):
     global_res_round = 0
 
     global_res_update = 5
+    use_global_res = False
 
     for global_round in range(mArgs.global_round):
         worker_model_dicts = {}
@@ -154,15 +155,21 @@ def main(mArgs):
 
         for worker_id in tqdm(clients_train, unit="client", leave=True):
 
-            if clients_time[worker_id] > global_res_round:
-                local_model, data_len, res_model_dict = train(copy.deepcopy(global_model.state_dict()),
-                                                              dataGen.get_client_DataLoader(worker_id), worker_id,
-                                                              res_model_clients[worker_id], device, mArgs,
-                                                              clients_time[worker_id], use_res=True)
+            if use_global_res:
+                if clients_time[worker_id] > global_res_round:
+                    local_model, data_len, res_model_dict = train(copy.deepcopy(global_model.state_dict()),
+                                                                  dataGen.get_client_DataLoader(worker_id), worker_id,
+                                                                  res_model_clients[worker_id], device, mArgs,
+                                                                  clients_time[worker_id], use_res=True)
+                else:
+                    local_model, data_len, res_model_dict = train(copy.deepcopy(global_model.state_dict()),
+                                                                  dataGen.get_client_DataLoader(worker_id), worker_id,
+                                                                  global_res, device, mArgs,
+                                                                  clients_time[worker_id], use_res=True)
             else:
                 local_model, data_len, res_model_dict = train(copy.deepcopy(global_model.state_dict()),
                                                               dataGen.get_client_DataLoader(worker_id), worker_id,
-                                                              global_res, device, mArgs,
+                                                              res_model_clients[worker_id], device, mArgs,
                                                               clients_time[worker_id], use_res=True)
 
             # print('L2  ',torch.norm(torch.tensor(local_model.Quanter.res), p=2))
@@ -177,21 +184,22 @@ def main(mArgs):
 
         data_sum = sum(worker_data_len.values())
 
-        if global_round % global_res_update == 0:
-            if global_res is None:
-                global_res = copy.deepcopy(global_model.state_dict())
-            for key in global_res.keys():
-                global_res[key] *= 0
-                for client_id in clients_train:
-                    global_res[key] += res_model_clients[client_id][key] * (
-                         worker_data_len[client_id] * 1.0 / data_sum)
+        if use_global_res:
+            if global_round % global_res_update == 0:
+                if global_res is None:
+                    global_res = copy.deepcopy(global_model.state_dict())
+                for key in global_res.keys():
+                    global_res[key] *= 0
+                    for client_id in clients_train:
+                        global_res[key] += res_model_clients[client_id][key] * (
+                             worker_data_len[client_id] * 1.0 / data_sum)
 
-                # print(global_update_dict[key])
-            global_res_round = global_round
+                    # print(global_update_dict[key])
+                global_res_round = global_round
 
-        for k in train_workers:
-            if k in clients_train:
-                clients_time[k] = global_round
+            for k in train_workers:
+                if k in clients_train:
+                    clients_time[k] = global_round
 
 
         global_dict = global_model.state_dict()

@@ -20,7 +20,7 @@ from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
 from HCFedAvg import FileProcess
 spare_rate = 0.3
-pre_global_res_update_round = 5
+pre_global_res_update_round = 10
 
 def train(global_model_dict, datasetLoader, worker_id, device, args, res_model_dict=None, use_res = True, is_quant = True):
     # 创建量化器
@@ -220,14 +220,16 @@ def main(args):
             else:
                 current_cluster = ClusterManager.get_cluster_by_id(clients_model[worker_id].InClusterID)
                 train_model_dict = current_cluster.get_avg_cluster_model_copy()
-
                 # 如果 本地残差比 全局的新，用本地的， 如果全局残差为空，也用本地的
                 if is_quant:
-                    if clients_model[worker_id].TrainRound >= global_res_round:
+                    if clients_model[worker_id].TrainRound >= current_cluster.GlobalResRound:
                         res_dict = clients_model[worker_id].LocalResDictUpdate
                     else:
                         if current_cluster.get_avg_cluster_res_copy() is not None:
+                            print("全局残差")
                             res_dict = current_cluster.get_avg_cluster_res_copy()
+                            train_model_dict = model_add(train_model_dict, res_dict)
+                            res_dict = None
                         else:
                             res_dict = clients_model[worker_id].LocalResDictUpdate
 
