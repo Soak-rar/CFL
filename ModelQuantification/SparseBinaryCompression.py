@@ -13,9 +13,9 @@ from HCFedAvg import FileProcess
 import global_set
 
 
-spare_rate = 0.005
+spare_rate = 0.3
 
-def train(global_model_dict, datasetLoader, worker_id,res_model_dict ,device, args: Args.Arguments,use_res = True):
+def train(global_model_dict, datasetLoader, worker_id,res_model_dict ,device, args: Args.Arguments, use_res = True):
     # if res_model_dict is not None and use_res:
     #     for name, parma in global_model_dict.items():
     #         global_model_dict[name] = parma + res_model_dict[name]
@@ -23,7 +23,7 @@ def train(global_model_dict, datasetLoader, worker_id,res_model_dict ,device, ar
     #     res_model_dict = copy.deepcopy(global_model_dict)
 
 
-    quanter = Model.STPandNQuanter()
+    quanter = Model.SpareBinaryQuanter()
     quanter.set_spare_rate(spare_rate)
     local_model = Model.init_model(args.model_name)
 
@@ -160,17 +160,17 @@ def main(mArgs):
                     local_model, data_len, res_model_dict = train(copy.deepcopy(global_model.state_dict()),
                                                                   dataGen.get_client_DataLoader(worker_id), worker_id,
                                                                   res_model_clients[worker_id], device, mArgs,
-                                                                  clients_time[worker_id], use_res=True)
+                                                                  use_res=True)
                 else:
                     local_model, data_len, res_model_dict = train(copy.deepcopy(global_model.state_dict()),
                                                                   dataGen.get_client_DataLoader(worker_id), worker_id,
                                                                   global_res, device, mArgs,
-                                                                  clients_time[worker_id], use_res=True)
+                                                                  use_res=True)
             else:
                 local_model, data_len, res_model_dict = train(copy.deepcopy(global_model.state_dict()),
                                                               dataGen.get_client_DataLoader(worker_id), worker_id,
                                                               res_model_clients[worker_id], device, mArgs,
-                                                              clients_time[worker_id], use_res=True)
+                                                              use_res=True)
 
             # print('L2  ',torch.norm(torch.tensor(local_model.Quanter.res), p=2))
             # dequant_model = local_model.dequant()
@@ -231,7 +231,7 @@ def main(mArgs):
 
 
     save_dict = mArgs.quant_save_dict()
-    save_dict['algorithm_name'] = 'FedAvg_Quant_without_res'
+    save_dict['algorithm_name'] = 'FedAvg_Quant使用非对称的稀疏三元量化'
     save_dict['acc'] = max(TotalAcc)
     save_dict['loss'] = min(TotalLoss)
     save_dict['acc_list'] = TotalAcc

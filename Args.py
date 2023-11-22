@@ -6,7 +6,7 @@ class Arguments:
         self.batch_size = 64
         self.test_batch_size = 64
         self.local_epochs = 2
-        self.lr = 0.0005
+        self.lr = 0.005
         self.save_model = True
         self.global_round = 500
         # 'cifar10'   'mnist'

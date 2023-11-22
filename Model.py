@@ -169,15 +169,30 @@ class STPandNQuanter:
             elif v < 0:
                 neg_list.append(v)
 
-        pos_mean = np.mean(pos_list)
-        neg_mean = np.mean(neg_list)
+        if len(pos_list) == 0:
+            pos_mean = 0
+            min_pos = 0
+        else:
+            pos_mean = np.mean(pos_list)
+            min_pos = min(pos_list)
+
+
+        if len(neg_list) == 0:
+            neg_mean = 0
+            max_neg = 0
+        else:
+            neg_mean = np.mean(neg_list)
+            max_neg = max(neg_list)
+
 
         # print('------------------')
         # print(pos_top_values)
         #
         # print(neg_top_values)
         # print('------------------')
-        return [pos_mean, neg_mean], [min(pos_list), max(neg_list)]
+
+
+        return [pos_mean, neg_mean], [min_pos, max_neg]
 
     def map_pos(self, x, *y):
         if x > 0:
