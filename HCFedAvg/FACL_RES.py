@@ -25,7 +25,7 @@ pre_global_res_update_round = 10
 def train(global_model_dict, datasetLoader, worker_id, device, args, res_model_dict=None, use_res = True, is_quant = True):
     # 创建量化器
     if is_quant:
-        quanter = Model.SpareBinaryQuanter()
+        quanter = Model.STCQuanter()
         quanter.set_spare_rate(spare_rate)
 
     # 创建模型
@@ -141,6 +141,16 @@ def avg(model_dict, local_model_dicts):
             model_dict[key] += (remote_model['model_dict'][key] * remote_model['data_len'] / total_len)
     return model_dict
 
+
+def quant_model(model_dict, args: Args.Arguments):
+    model = Model.init_model(args.model_name)
+    model.load_state_dict(model_dict)
+
+    quanter = Model.BitQuanter()
+    model.set_quanter(quanter)
+    model.quant()
+    return copy.deepcopy(model.dequant())
+
 def main(args):
 
     datasetGen = DatasetGen(args)
@@ -235,6 +245,9 @@ def main(args):
 
             clients_model[worker_id].PreModelStaticDict = copy.deepcopy(train_model_dict)
 
+            if res_dict is not None:
+                res_dict = quant_model(res_dict, args)
+
             train_info = train(train_model_dict, datasetGen.get_client_DataLoader(worker_id), worker_id, device, args, res_dict, True, is_quant)
 
             if is_quant:
@@ -281,7 +294,9 @@ def main(args):
                 # 更新本地 残差上传到服务端 的 记录
                 for worker_id in cluster_clients_train:
                     clients_model[worker_id].LocalToGlobalResRound = global_res_round
-                    clients_model[worker_id].update_global_res()
+                    if clients_model[worker_id].LocalResDictUpdate is not None:
+                        quant_res = quant_model(clients_model[worker_id].LocalResDictUpdate, args)
+                    clients_model[worker_id].LocalToGlobalResDictUpdate = quant_res
 
         # 更新本地 上传到服务端的 残差记录
         ClusterManager.UpdateClusterAvgModelAndResWithTime(clients_model, is_quant)

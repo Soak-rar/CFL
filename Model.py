@@ -422,6 +422,8 @@ class BitQuanter:
         # 将原始模型字典进行权重量化
         self.QuantedModelStateDict = copy.deepcopy(model_state_dict)
         for name, param in model_state_dict.items():
+            if name == args.deep_model_layer_name:
+                continue
             max_value = torch.max(param, ).item()
             min_value = torch.min(param, ).item()
 
@@ -459,6 +461,8 @@ class BitQuanter:
             self.DeQuantedModelStateDict = copy.deepcopy(model_state_dict)
 
             for name, param in self.QuantedModelStateDict.items():
+                if name == args.deep_model_layer_name:
+                    continue
                 self.scale, self.zero_point = self.layers_scale_zero_point[name]
                 new_param = param.clone().to(torch.float32)
 
