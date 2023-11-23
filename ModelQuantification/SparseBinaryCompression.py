@@ -172,8 +172,8 @@ def main(mArgs):
                                                                   use_res=True)
                 else:
 
-                    if global_res is not None:
-                        global_res = quant_model(global_res, mArgs)
+                    # if global_res is not None:
+                    #     global_res = quant_model(global_res, mArgs)
                     local_model, data_len, res_model_dict = train(copy.deepcopy(global_model.state_dict()),
                                                                   dataGen.get_client_DataLoader(worker_id), worker_id,
                                                                   global_res, device, mArgs,
@@ -203,8 +203,8 @@ def main(mArgs):
                 for key in global_res.keys():
                     global_res[key] *= 0
                     for client_id in clients_train:
-                        client_res = quant_model(res_model_clients[client_id], mArgs)
-                        global_res[key] += client_res[key] * (
+                        # client_res = quant_model(res_model_clients[client_id], mArgs)
+                        global_res[key] += res_model_clients[client_id][key] * (
                              worker_data_len[client_id] * 1.0 / data_sum)
 
                     # print(global_update_dict[key])
@@ -244,7 +244,7 @@ def main(mArgs):
 
 
     save_dict = mArgs.quant_save_dict()
-    save_dict['algorithm_name'] = 'FedAvg_Quant使用非对称的稀疏三元量化'
+    save_dict['algorithm_name'] = 'FedAvg_Quant_同步全局残差_不量化残差'
     save_dict['acc'] = max(TotalAcc)
     save_dict['loss'] = min(TotalLoss)
     save_dict['acc_list'] = TotalAcc
