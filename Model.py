@@ -12,7 +12,7 @@ import Args
 args = Args.Arguments()
 
 
-class STPandNQuanter:
+class STCQuanter:
     def __init__(self):
         self.QuantedModelStateDict: OrderedDict[str, torch.Tensor] = None
         self.DeQuantedModelStateDict: OrderedDict[str, torch.Tensor] = None
@@ -73,8 +73,19 @@ class STPandNQuanter:
             elif v < 0:
                 neg_list.append(v)
 
-        pos_mean = np.mean(pos_list)
-        neg_mean = np.mean(neg_list)
+        if len(pos_list) == 0:
+            pos_mean = 0
+            min_pos = 0
+        else:
+            pos_mean = np.mean(pos_list)
+            min_pos = min(pos_list)
+
+        if len(neg_list) == 0:
+            neg_mean = 0
+            max_neg = 0
+        else:
+            neg_mean = np.mean(neg_list)
+            max_neg = max(neg_list)
 
         # print('------------------')
         # print(pos_top_values)
@@ -82,7 +93,7 @@ class STPandNQuanter:
         # print(neg_top_values)
         # print('------------------')
         mean_v = torch.mean(abs_top_values[0])
-        return [mean_v, mean_v], [min(pos_list), max(neg_list)]
+        return [mean_v, mean_v], [min_pos, max_neg]
 
     def map_pos(self, x, *y):
         if x > 0:
@@ -98,9 +109,9 @@ class STPandNQuanter:
         pass
 
     def quant(self, x, *y):
-        if x >= self.edge_value[0]:
+        if self.edge_value[0]!= 0 and x >= self.edge_value[0]:
             return self.quant_value[0]
-        if x <= self.edge_value[1]:
+        if self.edge_value[1]!= 0 and x <= self.edge_value[1]:
             return self.quant_value[1]*-1
         return 0
 
@@ -208,9 +219,9 @@ class STPandNQuanter:
         pass
 
     def quant(self, x, *y):
-        if x >= self.edge_value[0]:
+        if self.edge_value[0]!= 0 and x >= self.edge_value[0]:
             return self.quant_value[0]
-        if x <= self.edge_value[1]:
+        if self.edge_value[1]!= 0 and x <= self.edge_value[1]:
             return self.quant_value[1]
         return 0
 
@@ -361,7 +372,7 @@ class SpareBinaryQuanter:
     def dequant(self, x, *y):
         pass
 
-class QuantModelDict:
+class BitQuanter:
     def __init__(self):
         self.QuantedModelStateDict = None
         self.DeQuantedModelStateDict = None
@@ -391,13 +402,19 @@ class QuantModelDict:
 
 
     def quant(self, r, *y):
+        if self.scale == 0:
+            return round(self.zero_point)
         return round(r / self.scale + self.zero_point)
 
     def quant_test(self, r, *y):
+        if self.scale == 0:
+            return round(self.zero_point)
         q = round(r / self.scale + self.zero_point)
         return  q
 
     def dequant(self, q, *y):
+        if self.scale == 0:
+            return self.zero_point
         res = self.scale * (q - self.zero_point)
         return res
 
@@ -409,7 +426,10 @@ class QuantModelDict:
             min_value = torch.min(param, ).item()
 
             self.scale = (max_value - min_value) / (self.q_max - self.q_min)
-            self.zero_point = round(self.q_max - max_value / self.scale)
+            if self.scale == 0:
+                self.zero_point = max_value
+            else:
+                self.zero_point = round(self.q_max - max_value / self.scale)
             new_param = param.clone()
 
             self.layers_scale_zero_point[name] = [self.scale, self.zero_point]

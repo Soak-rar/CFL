@@ -228,8 +228,8 @@ def main(args):
                         if current_cluster.get_avg_cluster_res_copy() is not None:
                             print("全局残差")
                             res_dict = current_cluster.get_avg_cluster_res_copy()
-                            train_model_dict = model_add(train_model_dict, res_dict)
-                            res_dict = None
+                            # train_model_dict = model_add(train_model_dict, res_dict)
+                            # res_dict = None
                         else:
                             res_dict = clients_model[worker_id].LocalResDictUpdate
 
