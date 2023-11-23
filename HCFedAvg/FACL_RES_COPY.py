@@ -20,7 +20,7 @@ from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
 from HCFedAvg import FileProcess
 spare_rate = 0.1
-pre_global_res_update_round = 10
+pre_global_res_update_round = 5
 
 def train(global_model_dict, datasetLoader, worker_id, device, args, res_model_dict=None, use_res = True, is_quant = True):
     # 创建量化器
@@ -223,13 +223,14 @@ def main(args):
 
                 # 如果 本地残差比 全局的新，用本地的， 如果全局残差为空，也用本地的
                 if is_quant:
-                    if clients_model[worker_id].TrainRound >= global_res_round:
-                        res_dict = clients_model[worker_id].LocalResDictUpdate
-                    else:
-                        if current_cluster.get_avg_cluster_res_copy() is not None:
-                            res_dict = current_cluster.get_avg_cluster_res_copy()
-                        else:
-                            res_dict = clients_model[worker_id].LocalResDictUpdate
+                    # if clients_model[worker_id].TrainRound >= global_res_round:
+                    #     res_dict = clients_model[worker_id].LocalResDictUpdate
+                    # else:
+                    #     if current_cluster.get_avg_cluster_res_copy() is not None:
+                    #         res_dict = current_cluster.get_avg_cluster_res_copy()
+                    #     else:
+                    #         res_dict = clients_model[worker_id].LocalResDictUpdate
+                    res_dict = clients_model[worker_id].LocalResDictUpdate
 
                 clients_model[worker_id].TrainRound = epoch
 
@@ -327,7 +328,7 @@ def main(args):
         print("Epoch------------------------------------: {}\t, HCCFL\t: Acc : {}\t, Max_Acc : {}\t".format(epoch, TotalAcc[epoch], current_max_acc))
 
     save_dict = args.save_dict()
-    save_dict['algorithm_name'] = 'HCCFL_res_spare_0.1_res_5_no_deep'  # 'HCCFL_res_spare_0.3_res_5_no_deep'
+    save_dict['algorithm_name'] = 'HCCFL_res_spare_0.1_res_5_no_global_res_量化深层'  # 'HCCFL_res_spare_0.3_res_5_no_deep'
     save_dict['acc'] = max(TotalAcc)
     save_dict['loss'] = min(TotalLoss)
     save_dict['traffic'] = 200*10
