@@ -1,5 +1,7 @@
 import copy
 from typing import *
+
+import numpy as np
 import torch.nn as nn
 from torch.nn import functional as F
 import torch
@@ -9,6 +11,224 @@ import Args
 
 args = Args.Arguments()
 
+
+class STCQuanter:
+    def __init__(self):
+        self.QuantedModelStateDict: OrderedDict[str, torch.Tensor] = None
+        self.DeQuantedModelStateDict: OrderedDict[str, torch.Tensor] = None
+
+        self.layers_scale_zero_point = {}  # str: [quant_value, bool] true = pos, false = neg
+        self.spare_rate = 0.05
+
+        self.quant_value = [0, 0]
+        self.symbol = None
+        self.edge_value = [0, 0]
+
+    def set_spare_rate(self, new_spare_rate):
+        self.spare_rate = new_spare_rate
+
+    def find_top_positive(self):
+        pass
+
+    def init_layers(self, model: nn.Module):
+        for name, module in model.named_parameters():
+            self.layers_scale_zero_point[name] = [0, None]
+
+    def quant_layer(self, layer_param):
+        mean_values, self.edge_value = self.get_layer_quant_value(copy.deepcopy(layer_param))
+        # print(quant_value, _, self.edge_value)
+        self.quant_value = mean_values
+
+        new_param = layer_param.clone()
+        quanted_param = new_param.map_(new_param, self.quant)
+        return quanted_param
+
+    def quant_model(self, model_state_dict):
+        self.QuantedModelStateDict = copy.deepcopy(model_state_dict)
+        for name, param in model_state_dict.items():
+
+            if name == args.deep_model_layer_name:
+                continue
+            self.QuantedModelStateDict[name] = self.quant_layer(param)
+        return self.QuantedModelStateDict
+
+    #  非对称的 top_k
+    def get_layer_quant_value(self, layer_tensor):
+        # 计算每层的 稀疏量化值
+        cat_tensor = layer_tensor.reshape(-1)
+        top_size = math.ceil(cat_tensor.size()[0] * self.spare_rate)
+
+        abs_cat_tensor = torch.abs(cat_tensor)
+
+        abs_top_values = torch.topk(abs_cat_tensor, top_size, largest=True)
+
+        top_tensor = torch.take(cat_tensor, abs_top_values[1])
+
+        pos_list = []
+        neg_list = []
+
+        for v in top_tensor:
+            if v > 0:
+                pos_list.append(v)
+            elif v < 0:
+                neg_list.append(v)
+
+        if len(pos_list) == 0:
+            pos_mean = 0
+            min_pos = 0
+        else:
+            pos_mean = np.mean(pos_list)
+            min_pos = min(pos_list)
+
+        if len(neg_list) == 0:
+            neg_mean = 0
+            max_neg = 0
+        else:
+            neg_mean = np.mean(neg_list)
+            max_neg = max(neg_list)
+
+        # print('------------------')
+        # print(pos_top_values)
+        #
+        # print(neg_top_values)
+        # print('------------------')
+        mean_v = torch.mean(abs_top_values[0])
+        return [mean_v, mean_v], [min_pos, max_neg]
+
+    def map_pos(self, x, *y):
+        if x > 0:
+            return x
+        return 0
+
+    def map_neg(self, x, *y):
+        if x < 0:
+            return x
+        return 0
+
+    def dequant_model(self):
+        pass
+
+    def quant(self, x, *y):
+        if self.edge_value[0]!= 0 and x >= self.edge_value[0]:
+            return self.quant_value[0]
+        if self.edge_value[1]!= 0 and x <= self.edge_value[1]:
+            return self.quant_value[1]*-1
+        return 0
+
+    def dequant(self, x, *y):
+        pass
+
+# 非对称正负稀疏三元量化 (a, 0 ,b) |a| != |b|
+class STPandNQuanter:
+    def __init__(self):
+        self.QuantedModelStateDict: OrderedDict[str, torch.Tensor] = None
+        self.DeQuantedModelStateDict: OrderedDict[str, torch.Tensor] = None
+
+        self.layers_scale_zero_point = {}  # str: [quant_value, bool] true = pos, false = neg
+        self.spare_rate = 0.05
+
+        self.quant_value = [0, 0]
+        self.symbol = None
+        self.edge_value = [0, 0]
+
+    def set_spare_rate(self, new_spare_rate):
+        self.spare_rate = new_spare_rate
+
+    def find_top_positive(self):
+        pass
+
+    def init_layers(self, model: nn.Module):
+        for name, module in model.named_parameters():
+            self.layers_scale_zero_point[name] = [0, None]
+
+    def quant_layer(self, layer_param):
+        mean_values, self.edge_value = self.get_layer_quant_value(copy.deepcopy(layer_param))
+        # print(quant_value, _, self.edge_value)
+        self.quant_value = mean_values
+
+        new_param = layer_param.clone()
+        quanted_param = new_param.map_(new_param, self.quant)
+        return quanted_param
+
+    def quant_model(self, model_state_dict):
+        self.QuantedModelStateDict = copy.deepcopy(model_state_dict)
+        for name, param in model_state_dict.items():
+
+            if name == args.deep_model_layer_name:
+                continue
+            self.QuantedModelStateDict[name] = self.quant_layer(param)
+        return self.QuantedModelStateDict
+
+    #  非对称的 top_k
+    def get_layer_quant_value(self, layer_tensor):
+        # 计算每层的 稀疏量化值
+        cat_tensor = layer_tensor.reshape(-1)
+        top_size = math.ceil(cat_tensor.size()[0] * self.spare_rate)
+
+        abs_cat_tensor = torch.abs(cat_tensor)
+
+        abs_top_values = torch.topk(abs_cat_tensor, top_size, largest=True)
+
+        top_tensor = torch.take(cat_tensor, abs_top_values[1])
+
+        pos_list = []
+        neg_list = []
+
+        for v in top_tensor:
+            if v > 0:
+                pos_list.append(v)
+            elif v < 0:
+                neg_list.append(v)
+
+        if len(pos_list) == 0:
+            pos_mean = 0
+            min_pos = 0
+        else:
+            pos_mean = np.mean(pos_list)
+            min_pos = min(pos_list)
+
+
+        if len(neg_list) == 0:
+            neg_mean = 0
+            max_neg = 0
+        else:
+            neg_mean = np.mean(neg_list)
+            max_neg = max(neg_list)
+
+
+        # print('------------------')
+        # print(pos_top_values)
+        #
+        # print(neg_top_values)
+        # print('------------------')
+
+
+        return [pos_mean, neg_mean], [min_pos, max_neg]
+
+    def map_pos(self, x, *y):
+        if x > 0:
+            return x
+        return 0
+
+    def map_neg(self, x, *y):
+        if x < 0:
+            return x
+        return 0
+
+    def dequant_model(self):
+        pass
+
+    def quant(self, x, *y):
+        if self.edge_value[0]!= 0 and x >= self.edge_value[0]:
+            return self.quant_value[0]
+        if self.edge_value[1]!= 0 and x <= self.edge_value[1]:
+            return self.quant_value[1]
+        return 0
+
+    def dequant(self, x, *y):
+        pass
+
+# 稀疏二元量化 (a, 0)
 class SpareBinaryQuanter:
     def __init__(self):
         self.QuantedModelStateDict:OrderedDict[str, torch.Tensor] = None
@@ -61,6 +281,7 @@ class SpareBinaryQuanter:
             self.QuantedModelStateDict[name] = quanted_param
         return self.QuantedModelStateDict
 
+
     def get_layer_quant_value(self, layer_tensor):
         # 计算每层的 稀疏量化值
         cat_tensor = layer_tensor.reshape(-1)
@@ -83,6 +304,48 @@ class SpareBinaryQuanter:
             return pos_mean, True, torch.min(pos_top_values[0])
         else:
             return neg_mean, False, torch.max(neg_top_values[0])
+
+    #  非对称的 top_k
+    def get_layer_quant_value_PandN(self, layer_tensor):
+        # 计算每层的 稀疏量化值
+        cat_tensor = layer_tensor.reshape(-1)
+        top_size = math.ceil(cat_tensor.size()[0] * self.spare_rate)
+
+        abs_cat_tensor = torch.abs(cat_tensor)
+
+        abs_top_values = torch.topk(abs_cat_tensor, top_size, largest=True)
+
+        top_tensor = torch.take(cat_tensor, abs_top_values[1])
+
+        pos_list = []
+        neg_list = []
+
+        for v in top_tensor:
+            if v > 0:
+                pos_list.append(v)
+            elif v < 0:
+                neg_list.append(v)
+
+        pos_mean = np.mean(pos_list)
+        neg_mean = np.mean(neg_list)
+
+
+        # print('------------------')
+        # print(pos_top_values)
+        #
+        # print(neg_top_values)
+        # print('------------------')
+        return pos_mean, neg_mean
+
+    def map_pos(self, x, *y):
+        if x > 0:
+            return  x
+        return 0
+
+    def map_neg(self, x, *y):
+        if x < 0:
+            return  x
+        return 0
 
     def dequant_model(self):
         pass
@@ -109,7 +372,7 @@ class SpareBinaryQuanter:
     def dequant(self, x, *y):
         pass
 
-class QuantModelDict:
+class BitQuanter:
     def __init__(self):
         self.QuantedModelStateDict = None
         self.DeQuantedModelStateDict = None
@@ -139,13 +402,19 @@ class QuantModelDict:
 
 
     def quant(self, r, *y):
+        if self.scale == 0:
+            return round(self.zero_point)
         return round(r / self.scale + self.zero_point)
 
     def quant_test(self, r, *y):
+        if self.scale == 0:
+            return round(self.zero_point)
         q = round(r / self.scale + self.zero_point)
         return  q
 
     def dequant(self, q, *y):
+        if self.scale == 0:
+            return self.zero_point
         res = self.scale * (q - self.zero_point)
         return res
 
@@ -157,7 +426,10 @@ class QuantModelDict:
             min_value = torch.min(param, ).item()
 
             self.scale = (max_value - min_value) / (self.q_max - self.q_min)
-            self.zero_point = round(self.q_max - max_value / self.scale)
+            if self.scale == 0:
+                self.zero_point = max_value
+            else:
+                self.zero_point = round(self.q_max - max_value / self.scale)
             new_param = param.clone()
 
             self.layers_scale_zero_point[name] = [self.scale, self.zero_point]

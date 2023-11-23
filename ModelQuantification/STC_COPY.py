@@ -123,15 +123,6 @@ def test(model, dataset_loader, device):
     return test_loss, correct / test_len
 
 
-def quant_model(model_dict, args: Args.Arguments):
-    model = Model.init_model(args.model_name)
-    model.load_state_dict(model_dict)
-
-    quanter = Model.BitQuanter()
-    model.set_quanter(quanter)
-    model.quant()
-    return copy.deepcopy(model.dequant())
-
 def main(mArgs):
     dataGen = DatasetGen(mArgs)
 
@@ -154,7 +145,7 @@ def main(mArgs):
     global_res_round = 0
 
     global_res_update = 5
-    use_global_res = True
+    use_global_res = False
 
     for global_round in range(mArgs.global_round):
         worker_model_dicts = {}
@@ -171,9 +162,6 @@ def main(mArgs):
                                                                   res_model_clients[worker_id], device, mArgs,
                                                                   use_res=True)
                 else:
-
-                    if global_res is not None:
-                        global_res = quant_model(global_res, mArgs)
                     local_model, data_len, res_model_dict = train(copy.deepcopy(global_model.state_dict()),
                                                                   dataGen.get_client_DataLoader(worker_id), worker_id,
                                                                   global_res, device, mArgs,
@@ -203,8 +191,7 @@ def main(mArgs):
                 for key in global_res.keys():
                     global_res[key] *= 0
                     for client_id in clients_train:
-                        client_res = quant_model(res_model_clients[client_id], mArgs)
-                        global_res[key] += client_res[key] * (
+                        global_res[key] += res_model_clients[client_id][key] * (
                              worker_data_len[client_id] * 1.0 / data_sum)
 
                     # print(global_update_dict[key])
@@ -244,7 +231,7 @@ def main(mArgs):
 
 
     save_dict = mArgs.quant_save_dict()
-    save_dict['algorithm_name'] = 'FedAvg_Quant使用非对称的稀疏三元量化'
+    save_dict['algorithm_name'] = 'FedAvg_Quant使用STC的稀疏三元量化'
     save_dict['acc'] = max(TotalAcc)
     save_dict['loss'] = min(TotalLoss)
     save_dict['acc_list'] = TotalAcc
