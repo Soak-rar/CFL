@@ -20,8 +20,9 @@ from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
 from HCFedAvg import FileProcess
 
+
+
 def train(global_model_dict, datasetLoader, worker_id, device, args, A_args: Args.AlgorithmParams, res_model_dict=None, use_res = True, is_quant = True):
-    print("client")
     # 创建量化器
     if is_quant:
         quanter = Model.STCQuanter()
@@ -150,8 +151,9 @@ def quant_model(model_dict, args: Args.Arguments):
     model.quant()
     return copy.deepcopy(model.dequant())
 
-def main(args):
-    args_set = Args.ArgsSet("Config_1", "Data_2")
+def main(Config_name, Data_name):
+    args = Args.Arguments()
+    args_set = Args.ArgsSet(Config_name, Data_name)
     A_args = Args.AlgorithmParams()
     ClusterManager = HCClusterTree.HCClusterManager()
     args_set.set_all_args(args,ClusterManager, A_args)
@@ -594,5 +596,5 @@ def calculate_min_dis(model_dict_1, model_dict_2, client_l_pre_dict, client_r_pr
 
 
 if __name__ == '__main__':
-    MyArgs = Args.Arguments()
-    main(MyArgs)
+    pass
+
