@@ -11,7 +11,6 @@ import Args
 
 args = Args.Arguments()
 
-
 class STCQuanter:
     def __init__(self):
         self.QuantedModelStateDict: OrderedDict[str, torch.Tensor] = None
