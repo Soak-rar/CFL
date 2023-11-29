@@ -2,6 +2,8 @@
   "name": "HCFedAvg",
   "version": "1.0.0",
   "bool": true,
+
+
   "Config_1": {
     "Description": "FACL_RES_上传本地残差的bit量化，将全局残差和全局模型累加下载到本地",
     "ClusterTree": {
@@ -23,6 +25,8 @@
       "pre_global_res_update_round": 10
     }
   },
+
+  
   "Config_2": {
     "Description": "FACL_STC_Only_Local_Quant",
     "ClusterTree": {
@@ -44,10 +48,12 @@
       "pre_global_res_update_round": 10
     }
   },
+
+
   "Data_1": {
     "lr": 0.0005,
     "global_round": 200,
-    "dataset_name": "cifar10",
+    "dataset_name": "mnist",
     "optim": "Adam",
     "data_info":{
       "data_labels": [[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 7], [6, 7, 8, 9], [0, 1, 8, 9]],
@@ -62,7 +68,55 @@
     "dataset_name": "mnist",
     "optim": "Adam",
     "data_info":{
+      "data_labels": [[0, 1, 2, 3, 4], [1, 2, 3], [5, 6, 7, 8, 9], [6, 7, 8], [0, 4, 5, 9]],
+      "data_rot": [],
+      "divide_type": "labels"
+    },
+    "cuda": true
+  },
+   "Data_3": {
+    "lr": 0.0005,
+    "global_round": 200,
+    "dataset_name": "mnist",
+    "optim": "Adam",
+    "data_info":{
+      "data_labels": [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]],
+      "data_rot": [],
+      "divide_type": "labels"
+    },
+    "cuda": true
+  },
+    "Data_4": {
+    "lr": 0.0005,
+    "global_round": 200,
+    "dataset_name": "cifar10",
+    "optim": "Adam",
+    "data_info":{
       "data_labels": [[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 7], [6, 7, 8, 9], [0, 1, 8, 9]],
+      "data_rot": [],
+      "divide_type": "labels"
+    },
+    "cuda": true
+  },
+  "Data_5": {
+    "lr": 0.0005,
+    "global_round": 200,
+    "dataset_name": "cifar10",
+    "optim": "Adam",
+    "data_info":{
+      "data_labels": [[0, 1, 2, 3, 4], [1, 2, 3], [5, 6, 7, 8, 9], [6, 7, 8], [0, 4, 5, 9]],
+      "data_rot": [],
+      "divide_type": "labels"
+    },
+    "cuda": true
+  },
+   "Data_6": {
+    "lr": 0.0005,
+    "global_round": 200,
+    "dataset_name": "cifar10",
+    "optim": "Adam",
+    "data_info":{
+      "data_labels": [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]],
       "data_rot": [],
       "divide_type": "labels"
     },

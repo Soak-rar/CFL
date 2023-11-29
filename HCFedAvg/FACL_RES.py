@@ -367,6 +367,7 @@ def main(Config_name, Data_name):
     save_dict['sim_std'] = SimSTD
     save_dict['sim_mean'] = SimMean
     save_dict['DownResCounts'] = down_res_counts
+    save_dict['Config_name'] = Data_name + "_"+ Config_name
 
     FileProcess.add_row(save_dict)
 
