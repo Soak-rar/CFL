@@ -193,6 +193,17 @@ def main(args):
     global_res_round = 0
 
     is_quant = True
+
+    # 是否对传输的残差进行 bit 量化
+    is_quant_res = True
+
+    is_res_add2model = True
+
+    # 记录下载全局残差的次数
+    down_res_counts = 0
+
+    # 记录当前轮次下行 残差的次数
+    down_res_list = []
     for epoch in range(args.global_round):
 
         ### 加权随机
@@ -237,7 +248,11 @@ def main(args):
                         res_dict = clients_model[worker_id].LocalResDictUpdate
                     else:
                         if current_cluster.get_avg_cluster_res_copy() is not None:
+                            down_res_counts += 1
                             res_dict = current_cluster.get_avg_cluster_res_copy()
+                            if is_res_add2model:
+                                train_model_dict = model_add(train_model_dict, res_dict)
+                                res_dict = None
                         else:
                             res_dict = clients_model[worker_id].LocalResDictUpdate
 
@@ -245,8 +260,8 @@ def main(args):
 
             clients_model[worker_id].PreModelStaticDict = copy.deepcopy(train_model_dict)
 
-            if res_dict is not None:
-                res_dict = quant_model(res_dict, args)
+            # if res_dict is not None and is_quant_res:
+            #     res_dict = quant_model(res_dict, args)
 
             train_info = train(train_model_dict, datasetGen.get_client_DataLoader(worker_id), worker_id, device, args, res_dict, True, is_quant)
 
@@ -294,9 +309,11 @@ def main(args):
                 # 更新本地 残差上传到服务端 的 记录
                 for worker_id in cluster_clients_train:
                     clients_model[worker_id].LocalToGlobalResRound = global_res_round
-                    if clients_model[worker_id].LocalResDictUpdate is not None:
+                    if clients_model[worker_id].LocalResDictUpdate is not None and is_quant_res:
                         quant_res = quant_model(clients_model[worker_id].LocalResDictUpdate, args)
-                    clients_model[worker_id].LocalToGlobalResDictUpdate = quant_res
+                        clients_model[worker_id].LocalToGlobalResDictUpdate = quant_res
+                    else:
+                        clients_model[worker_id].update_global_res()
 
         # 更新本地 上传到服务端的 残差记录
         ClusterManager.UpdateClusterAvgModelAndResWithTime(clients_model, is_quant)
@@ -318,6 +335,10 @@ def main(args):
 
             if top_acc[int(cluster_id) % args.cluster_number] < acc:
                 top_acc[int(cluster_id % args.cluster_number)] = acc
+
+
+
+        down_res_list.append(down_res_counts)
 
         # 输出当前轮次集群结果
 
@@ -342,16 +363,17 @@ def main(args):
         print("Epoch------------------------------------: {}\t, HCCFL\t: Acc : {}\t, Max_Acc : {}\t".format(epoch, TotalAcc[epoch], current_max_acc))
 
     save_dict = args.save_dict()
-    save_dict['algorithm_name'] = 'HCCFL_res_spare_0.1_res_5_no_deep'  # 'HCCFL_res_spare_0.3_res_5_no_deep'
+    save_dict['algorithm_name'] = 'HCCFL_res_使用上行量化bit量化残差_下行不量化但是累加到模型'  # 'HCCFL_res_spare_0.3_res_5_no_deep'
     save_dict['acc'] = max(TotalAcc)
     save_dict['loss'] = min(TotalLoss)
     save_dict['traffic'] = 200*10
     save_dict['acc_list'] = TotalAcc
     save_dict['loss_list'] = TotalLoss
-    save_dict['extra_param'] = "random seed " + str(random_seed) + " H " + str(ClusterManager.H)
+    save_dict['extra_param'] = "random seed " + str(random_seed) + " H " + str(ClusterManager.H)+ "spare_rate_" + str(spare_rate) + "global_res_" + str(pre_global_res_update_round)
     save_dict['final_cluster_number'] = FinalClusterNumber
     save_dict['sim_std'] = SimSTD
     save_dict['sim_mean'] = SimMean
+    save_dict['DownResCounts'] = down_res_counts
 
     FileProcess.add_row(save_dict)
 

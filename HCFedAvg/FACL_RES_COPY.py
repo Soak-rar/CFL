@@ -20,12 +20,12 @@ from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
 from HCFedAvg import FileProcess
 spare_rate = 0.1
-pre_global_res_update_round = 5
+pre_global_res_update_round = 10
 
 def train(global_model_dict, datasetLoader, worker_id, device, args, res_model_dict=None, use_res = True, is_quant = True):
     # 创建量化器
     if is_quant:
-        quanter = Model.SpareBinaryQuanter()
+        quanter = Model.STCQuanter()
         quanter.set_spare_rate(spare_rate)
 
     # 创建模型
@@ -141,6 +141,16 @@ def avg(model_dict, local_model_dicts):
             model_dict[key] += (remote_model['model_dict'][key] * remote_model['data_len'] / total_len)
     return model_dict
 
+
+def quant_model(model_dict, args: Args.Arguments):
+    model = Model.init_model(args.model_name)
+    model.load_state_dict(model_dict)
+
+    quanter = Model.BitQuanter()
+    model.set_quanter(quanter)
+    model.quant()
+    return copy.deepcopy(model.dequant())
+
 def main(args):
 
     datasetGen = DatasetGen(args)
@@ -183,6 +193,19 @@ def main(args):
     global_res_round = 0
 
     is_quant = True
+
+    is_use_global_res = False
+
+    # 是否对传输的残差进行 bit 量化
+    is_quant_res = True
+
+    is_res_add2model = True
+
+    # 记录下载全局残差的次数
+    down_res_counts = 0
+
+    # 记录当前轮次下行 残差的次数
+    down_res_list = []
     for epoch in range(args.global_round):
 
         ### 加权随机
@@ -223,18 +246,28 @@ def main(args):
 
                 # 如果 本地残差比 全局的新，用本地的， 如果全局残差为空，也用本地的
                 if is_quant:
-                    # if clients_model[worker_id].TrainRound >= global_res_round:
-                    #     res_dict = clients_model[worker_id].LocalResDictUpdate
-                    # else:
-                    #     if current_cluster.get_avg_cluster_res_copy() is not None:
-                    #         res_dict = current_cluster.get_avg_cluster_res_copy()
-                    #     else:
-                    #         res_dict = clients_model[worker_id].LocalResDictUpdate
-                    res_dict = clients_model[worker_id].LocalResDictUpdate
+                    if is_use_global_res:
+                        if clients_model[worker_id].TrainRound >= global_res_round:
+                            res_dict = clients_model[worker_id].LocalResDictUpdate
+                        else:
+                            if current_cluster.get_avg_cluster_res_copy() is not None:
+                                down_res_counts += 1
+                                res_dict = current_cluster.get_avg_cluster_res_copy()
+                                if is_res_add2model:
+                                    train_model_dict = model_add(train_model_dict, res_dict)
+                                    res_dict = None
+                            else:
+                                res_dict = clients_model[worker_id].LocalResDictUpdate
+                        if res_dict is not None and is_quant_res:
+                            res_dict = quant_model(res_dict, args)
+                    else:
+                        res_dict = clients_model[worker_id].LocalResDictUpdate
 
                 clients_model[worker_id].TrainRound = epoch
 
             clients_model[worker_id].PreModelStaticDict = copy.deepcopy(train_model_dict)
+
+
 
             train_info = train(train_model_dict, datasetGen.get_client_DataLoader(worker_id), worker_id, device, args, res_dict, True, is_quant)
 
@@ -277,12 +310,17 @@ def main(args):
         t1 = time.time()
 
         if is_quant:
-            if epoch % pre_global_res_update_round == 0 and epoch != 0:
-                global_res_round = epoch
-                # 更新本地 残差上传到服务端 的 记录
-                for worker_id in cluster_clients_train:
-                    clients_model[worker_id].LocalToGlobalResRound = global_res_round
-                    clients_model[worker_id].update_global_res()
+            if is_use_global_res:
+                if epoch % pre_global_res_update_round == 0 and epoch != 0:
+                    global_res_round = epoch
+                    # 更新本地 残差上传到服务端 的 记录
+                    for worker_id in cluster_clients_train:
+                        clients_model[worker_id].LocalToGlobalResRound = global_res_round
+                        if clients_model[worker_id].LocalResDictUpdate is not None and is_quant_res:
+                            quant_res = quant_model(clients_model[worker_id].LocalResDictUpdate, args)
+                            clients_model[worker_id].LocalToGlobalResDictUpdate = quant_res
+                        else:
+                            clients_model[worker_id].update_global_res()
 
         # 更新本地 上传到服务端的 残差记录
         ClusterManager.UpdateClusterAvgModelAndResWithTime(clients_model, is_quant)
@@ -304,6 +342,10 @@ def main(args):
 
             if top_acc[int(cluster_id) % args.cluster_number] < acc:
                 top_acc[int(cluster_id % args.cluster_number)] = acc
+
+
+
+        down_res_list.append(down_res_counts)
 
         # 输出当前轮次集群结果
 
@@ -328,16 +370,17 @@ def main(args):
         print("Epoch------------------------------------: {}\t, HCCFL\t: Acc : {}\t, Max_Acc : {}\t".format(epoch, TotalAcc[epoch], current_max_acc))
 
     save_dict = args.save_dict()
-    save_dict['algorithm_name'] = 'HCCFL_res_spare_0.1_res_5_no_global_res_量化深层'  # 'HCCFL_res_spare_0.3_res_5_no_deep'
+    save_dict['algorithm_name'] = 'HCCFL_res_不使用全局残差同步'  # 'HCCFL_res_spare_0.3_res_5_no_deep'
     save_dict['acc'] = max(TotalAcc)
     save_dict['loss'] = min(TotalLoss)
     save_dict['traffic'] = 200*10
     save_dict['acc_list'] = TotalAcc
     save_dict['loss_list'] = TotalLoss
-    save_dict['extra_param'] = "random seed " + str(random_seed) + " H " + str(ClusterManager.H)
+    save_dict['extra_param'] = "random seed " + str(random_seed) + " H " + str(ClusterManager.H)+ "spare_rate_" + str(spare_rate) + "global_res_" + str(pre_global_res_update_round)
     save_dict['final_cluster_number'] = FinalClusterNumber
     save_dict['sim_std'] = SimSTD
     save_dict['sim_mean'] = SimMean
+    save_dict['DownResCounts'] = down_res_counts
 
     FileProcess.add_row(save_dict)
 

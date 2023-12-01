@@ -66,6 +66,7 @@ def read_row_with_file_name(row_id, filename):
 
 if __name__ == '__main__':
 
+    add_new_column("DownResCounts")
     # args = Args.Arguments()
     # create_file("ModelQuantification/QuantResult", args.quant_save_dict())
 

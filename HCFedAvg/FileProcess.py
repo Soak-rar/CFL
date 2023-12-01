@@ -71,13 +71,14 @@ def read_row_with_file_name(row_id, filename):
 
 if __name__ == '__main__':
 
+
     # create_file("")
-    # add_new_column("extra_param")
+    # add_new_column("DownResCounts")
     # add_new_column_with_file("L2", "TAS_result")
 
-    # add_new_column('sim_std')
+    # # add_new_column('sim_std')
     args = Args.Arguments()
-    res_1 = read_row(15)
+    res_1 = read_row(56)
     # 将字符串转换为Python列表
     float_list = ast.literal_eval(res_1['acc_list'])
 
@@ -89,17 +90,17 @@ if __name__ == '__main__':
     count = 0
     had = [False, False, False]
     for i, acc in enumerate(float_list):
-        if count == 0 and acc >=0.85:
+        if count == 0 and acc >=0.95:
             count +=1
             continue
-        if acc >= 0.85 and had[0] is False:
+        if acc >= 0.95 and had[0] is False:
             had[0] = True
             print(i)
-        if acc >= 0.87 and had[1] is False:
+        if acc >= 0.97 and had[1] is False:
             had[1] = True
 
             print(i)
-        if acc >= 0.89 and had[2] is False:
+        if acc >= 0.99 and had[2] is False:
             had[2] = True
             print(i)
     pass

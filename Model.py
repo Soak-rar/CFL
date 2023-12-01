@@ -267,8 +267,8 @@ class SpareBinaryQuanter:
         self.QuantedModelStateDict = copy.deepcopy(model_state_dict)
         for name, param in model_state_dict.items():
 
-            # if name == args.deep_model_layer_name:
-            #     continue
+            if name == args.deep_model_layer_name:
+                continue
             quant_value, _, self.edge_value = self.get_layer_quant_value(copy.deepcopy(param))
             # print(quant_value, _, self.edge_value)
 

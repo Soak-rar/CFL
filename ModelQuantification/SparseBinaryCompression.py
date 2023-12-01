@@ -151,10 +151,13 @@ def main(mArgs):
     res_model_clients = {i: None for i in range(args.worker_num)}
 
     global_res = None
+
     global_res_round = 0
 
     global_res_update = 5
     use_global_res = True
+
+    is_quant_global_res = True
 
     for global_round in range(mArgs.global_round):
         worker_model_dicts = {}
@@ -172,8 +175,8 @@ def main(mArgs):
                                                                   use_res=True)
                 else:
 
-                    # if global_res is not None:
-                    #     global_res = quant_model(global_res, mArgs)
+                    if global_res is not None and is_quant_global_res:
+                        global_res = quant_model(global_res, mArgs)
                     local_model, data_len, res_model_dict = train(copy.deepcopy(global_model.state_dict()),
                                                                   dataGen.get_client_DataLoader(worker_id), worker_id,
                                                                   global_res, device, mArgs,
@@ -203,9 +206,14 @@ def main(mArgs):
                 for key in global_res.keys():
                     global_res[key] *= 0
                     for client_id in clients_train:
-                        # client_res = quant_model(res_model_clients[client_id], mArgs)
-                        global_res[key] += res_model_clients[client_id][key] * (
-                             worker_data_len[client_id] * 1.0 / data_sum)
+                        if is_quant_global_res:
+
+                            client_res = quant_model(res_model_clients[client_id], mArgs)
+                            global_res[key] += res_model_clients[client_id][key] * (
+                                    worker_data_len[client_id] * 1.0 / data_sum)
+                        else:
+                            global_res[key] += res_model_clients[client_id][key] * (
+                                 worker_data_len[client_id] * 1.0 / data_sum)
 
                     # print(global_update_dict[key])
                 global_res_round = global_round
@@ -244,7 +252,7 @@ def main(mArgs):
 
 
     save_dict = mArgs.quant_save_dict()
-    save_dict['algorithm_name'] = 'FedAvg_Quant_同步全局残差_不量化残差'
+    save_dict['algorithm_name'] = 'FedAvg_Quant_同步全局残差_量化残差'
     save_dict['acc'] = max(TotalAcc)
     save_dict['loss'] = min(TotalLoss)
     save_dict['acc_list'] = TotalAcc
