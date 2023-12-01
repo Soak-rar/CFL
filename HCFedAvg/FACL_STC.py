@@ -20,8 +20,6 @@ from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
 from HCFedAvg import FileProcess
 
-
-
 def train(global_model_dict, datasetLoader, worker_id, device, args, A_args: Args.AlgorithmParams, res_model_dict=None, use_res = True, is_quant = True):
     # 创建量化器
     if is_quant:
@@ -151,9 +149,8 @@ def quant_model(model_dict, args: Args.Arguments):
     model.quant()
     return copy.deepcopy(model.dequant())
 
-def main(Config_name, Data_name):
-    args = Args.Arguments()
-    args_set = Args.ArgsSet(Config_name, Data_name)
+def main(args):
+    args_set = Args.ArgsSet("Config_1", "Data_1")
     A_args = Args.AlgorithmParams()
     ClusterManager = HCClusterTree.HCClusterManager()
     args_set.set_all_args(args,ClusterManager, A_args)
@@ -175,6 +172,8 @@ def main(Config_name, Data_name):
 
     clients_model: Dict[int, ClientInServerData] = {}
 
+
+
     device = torch.device("cuda:0" if torch.cuda.is_available() and args.cuda else "cpu")
 
     TotalLoss = []
@@ -192,6 +191,13 @@ def main(Config_name, Data_name):
     current_max_acc = 0
 
     global_res_round = 0
+
+    is_quant = A_args.is_quant
+
+    # 是否对传输的残差进行 bit 量化
+    is_quant_res = A_args.is_quant_res
+
+    is_res_add2model = A_args.is_res_add2model
 
     # 记录下载全局残差的次数
     down_res_counts = 0
@@ -257,9 +263,9 @@ def main(Config_name, Data_name):
 
             clients_model[worker_id].PreModelStaticDict = copy.deepcopy(train_model_dict)
 
-            train_info = train(train_model_dict, datasetGen.get_client_DataLoader(worker_id), worker_id, device, args, A_args,res_dict, True, A_args.is_quant_local_update)
+            train_info = train(train_model_dict, datasetGen.get_client_DataLoader(worker_id), worker_id, device, args, A_args,res_dict, True, is_quant)
 
-            if A_args.is_quant_local_update:
+            if is_quant:
                 local_model = model_add(train_model_dict, train_info['quanted_model_update'])
             else:
                 local_model = model_add(train_model_dict, train_info['model_update'])
@@ -297,7 +303,7 @@ def main(Config_name, Data_name):
         # ClusterManager.UpdateClusterAvgModel(clients_model, cluster_clients_train)
         t1 = time.time()
 
-        if A_args.is_quant_local_update and A_args.is_ues_global_res:
+        if is_quant:
             if epoch % A_args.pre_global_res_update_round == 0 and epoch != 0:
                 global_res_round = epoch
                 # 更新本地 残差上传到服务端 的 记录
@@ -310,7 +316,7 @@ def main(Config_name, Data_name):
                         clients_model[worker_id].update_global_res()
 
         # 更新本地 上传到服务端的 残差记录
-        ClusterManager.UpdateClusterAvgModelAndResWithTime(clients_model, A_args.is_ues_global_res)
+        ClusterManager.UpdateClusterAvgModelAndResWithTime(clients_model, is_quant)
         t2 = time.time()
         print("Avg Time: ", t2 - t1)
         epoch_loss = []
@@ -367,7 +373,6 @@ def main(Config_name, Data_name):
     save_dict['sim_std'] = SimSTD
     save_dict['sim_mean'] = SimMean
     save_dict['DownResCounts'] = down_res_counts
-    save_dict['Config_name'] = Data_name + "_"+ Config_name
 
     FileProcess.add_row(save_dict)
 
@@ -597,5 +602,5 @@ def calculate_min_dis(model_dict_1, model_dict_2, client_l_pre_dict, client_r_pr
 
 
 if __name__ == '__main__':
-    pass
-
+    MyArgs = Args.Arguments()
+    main(MyArgs)
