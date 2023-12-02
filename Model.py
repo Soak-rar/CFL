@@ -162,7 +162,7 @@ class SpareQuanter:
 
         top_values, top_indices_flat = torch.topk(abs_flattened_tensor, num_elements_to_keep)
 
-        zero_indices = torch.zeros(total_elements)
+        zero_indices = torch.zeros(total_elements, dtype=torch.int)
         zero_indices[top_indices_flat] = 1
         spare_0_1_tensor = zero_indices.reshape(tensor.shape)
 
