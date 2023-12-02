@@ -6,9 +6,6 @@
 
   "Config_1": {
     "Description": "FACL_RES_上传本地残差的bit量化，将全局残差和全局模型累加下载到本地",
-    "ClusterTree": {
-      "H": 0.11
-    },
     "AlgorithmParams": {
       "random_seed": 2,
       "is_quant_local_update": true,
@@ -22,16 +19,14 @@
       "is_add_global_res_to_model": true,
 
       "spare_rate": 0.1,
-      "pre_global_res_update_round": 10
+      "pre_global_res_update_round": 10,
+      "quanter_name": "STCQuanter"
     }
   },
 
   
   "Config_2": {
     "Description": "FACL_STC_Only_Local_Quant",
-    "ClusterTree": {
-      "H": 0.11
-    },
     "AlgorithmParams": {
       "random_seed": 2,
       "is_quant_local_update": true,
@@ -45,14 +40,38 @@
       "is_add_global_res_to_model": false,
 
       "spare_rate": 0.1,
-      "pre_global_res_update_round": 10
+      "pre_global_res_update_round": 10,
+      "quanter_name": "STCQuanter"
+    }
+  },
+
+    "Config_3": {
+    "Description": "FACL_MEMSGD",
+    "AlgorithmParams": {
+      "random_seed": 2,
+      "is_quant_local_update": true,
+
+      "is_quant_up_local_res": false,
+      "is_quant_down_global_res": false,
+
+      "is_quant_down_update": false,
+
+      "is_ues_global_res": false,
+      "is_add_global_res_to_model": false,
+
+      "spare_rate": 0.1,
+      "pre_global_res_update_round": 10,
+      "quanter_name": "SpareQuanter"
     }
   },
 
 
   "Data_1": {
+    "ClusterTree": {
+      "H": 0.11
+    },
     "lr": 0.0005,
-    "global_round": 200,
+    "global_round": 300,
     "dataset_name": "mnist",
     "optim": "Adam",
     "data_info":{
@@ -62,9 +81,14 @@
     },
     "cuda": true
   },
+
+
   "Data_2": {
+    "ClusterTree": {
+      "H": 0.11
+    },
     "lr": 0.0005,
-    "global_round": 200,
+    "global_round": 300,
     "dataset_name": "mnist",
     "optim": "Adam",
     "data_info":{
@@ -75,8 +99,11 @@
     "cuda": true
   },
    "Data_3": {
+     "ClusterTree": {
+      "H": 0.11
+    },
     "lr": 0.0005,
-    "global_round": 200,
+    "global_round": 300,
     "dataset_name": "mnist",
     "optim": "Adam",
     "data_info":{
@@ -87,8 +114,11 @@
     "cuda": true
   },
     "Data_4": {
+      "ClusterTree": {
+      "H": 0.11
+    },
     "lr": 0.0005,
-    "global_round": 200,
+    "global_round": 300,
     "dataset_name": "cifar10",
     "optim": "Adam",
     "data_info":{
@@ -98,9 +128,13 @@
     },
     "cuda": true
   },
+
   "Data_5": {
+    "ClusterTree": {
+      "H": 0.11
+    },
     "lr": 0.0005,
-    "global_round": 200,
+    "global_round": 300,
     "dataset_name": "cifar10",
     "optim": "Adam",
     "data_info":{
@@ -111,12 +145,31 @@
     "cuda": true
   },
    "Data_6": {
+     "ClusterTree": {
+      "H": 0.11
+    },
     "lr": 0.0005,
-    "global_round": 200,
+    "global_round": 300,
     "dataset_name": "cifar10",
     "optim": "Adam",
     "data_info":{
       "data_labels": [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]],
+      "data_rot": [],
+      "divide_type": "labels"
+    },
+    "cuda": true
+  },
+
+  "Data_7": {
+    "ClusterTree": {
+      "H": 0.11
+    },
+    "lr": 0.001,
+    "global_round": 300,
+    "dataset_name": "cifar10",
+    "optim": "SGD",
+    "data_info":{
+      "data_labels": [[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 7], [6, 7, 8, 9], [0, 1, 8, 9]],
       "data_rot": [],
       "divide_type": "labels"
     },
