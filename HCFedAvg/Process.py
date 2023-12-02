@@ -10,5 +10,9 @@ class Process:
             arg(self.Config_name, self.Data_name)
 
 if __name__ == '__main__':
-    p = Process("Config_1", "Data_7")
+    Config_name = "Config_1"
+    Data_name = "Data_7"
+    p = Process(Config_name, Data_name)
+    print(Config_name)
+    print(Data_name)
     p(FACL_RES.main)
