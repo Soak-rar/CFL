@@ -10,5 +10,5 @@ class Process:
             arg(self.Config_name, self.Data_name)
 
 if __name__ == '__main__':
-    p = Process("Config_1", "Data_1")
+    p = Process("Config_1", "Data_7")
     p(FACL_RES.main)

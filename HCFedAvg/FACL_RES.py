@@ -25,7 +25,7 @@ from HCFedAvg import FileProcess
 def train(global_model_dict, datasetLoader, worker_id, device, args, A_args: Args.AlgorithmParams, res_model_dict=None, use_res = True, is_quant = True):
     # 创建量化器
     if is_quant:
-        quanter = Model.STCQuanter()
+        quanter = Model.init_quanter(A_args.quanter_name)
         quanter.set_spare_rate(A_args.spare_rate)
 
     # 创建模型
@@ -38,7 +38,13 @@ def train(global_model_dict, datasetLoader, worker_id, device, args, A_args: Arg
 
     old_model_dict = copy.deepcopy(global_model_dict)
 
-    optimizer = optim.Adam(local_model.parameters(), lr=args.lr)
+    if args.optim == "Adam":
+
+        optimizer = optim.Adam(local_model.parameters(), lr=args.lr)
+    elif args.optim == "SGD":
+        optimizer = optim.SGD(local_model.parameters(), lr=args.lr)
+
+
     local_model.train()
     local_model.to(device=device)
     data_size = 0

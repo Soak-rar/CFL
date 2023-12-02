@@ -177,6 +177,8 @@ class AlgorithmParams:
         self.spare_rate= 0.1
         self.pre_global_res_update_round= 10
 
+        self.quanter_name = "STCQuanter"
+
 class ArgsSet:
     def __init__(self, config_name, data_name):
         self.DataJsonObject = None
@@ -220,7 +222,7 @@ class ArgsSet:
         args.cuda = Argument_args["cuda"]
 
     def set_Cluster_args(self, clusterManager):
-        Cluster_args = self.ConfigJsonObject["ClusterTree"]
+        Cluster_args = self.DataJsonObject["ClusterTree"]
         clusterManager.H = Cluster_args["H"]
 
     def set_Algorithm_args(self, algorithm_: AlgorithmParams):
@@ -237,3 +239,5 @@ class ArgsSet:
 
         algorithm_.spare_rate = Argument_args['spare_rate']
         algorithm_.pre_global_res_update_round = Argument_args['pre_global_res_update_round']
+
+        algorithm_.quanter_name = Argument_args['quanter_name']
