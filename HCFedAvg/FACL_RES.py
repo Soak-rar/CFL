@@ -247,7 +247,7 @@ def main(Config_name, Data_name):
                 # 如果 本地残差比 全局的新，用本地的， 如果全局残差为空，也用本地的
                 if A_args.is_quant_local_update:
                     if A_args.is_ues_global_res:
-                        if clients_model[worker_id].LocalModelTrainRounds >= current_cluster.GlobalResRound:
+                        if clients_model[worker_id].LocalModelTrainRounds >= current_cluster.ClusterResRounds:
                             res_dict = clients_model[worker_id].LocalResDictUpdate
                         else:
                             if current_cluster.get_avg_cluster_res_copy() is not None:

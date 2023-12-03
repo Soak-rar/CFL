@@ -80,6 +80,8 @@ class HCCluster:
                         max_res_round = clients_model[client_id].LocalToGlobalResRound
                     elif clients_model[client_id].LocalToGlobalResRound == max_res_round:
                         max_res_clients.append(client_id)
+                        
+            self.ClusterResRounds = max_res_round
 
             for key in self.ClusterResDictUpdate.keys():
                 self.ClusterResDictUpdate[key] *= 0
