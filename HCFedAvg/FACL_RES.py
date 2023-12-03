@@ -234,22 +234,23 @@ def main(Config_name, Data_name):
 
         for i, worker_id in enumerate(cluster_clients_train):
             res_dict = None
+            global_train_rounds = 0
 
             if clients_model.get(worker_id) is None:
                 clients_model[worker_id] = ClientInServerData(worker_id, global_model.state_dict(), worker_id, 0)
                 train_model_dict = global_model.state_dict()
+
             else:
                 current_cluster = ClusterManager.get_cluster_by_id(clients_model[worker_id].InClusterID)
                 train_model_dict = current_cluster.get_avg_cluster_model_copy()
-
+                global_train_rounds = current_cluster.ClusterModelTrainRounds
                 # 如果 本地残差比 全局的新，用本地的， 如果全局残差为空，也用本地的
                 if A_args.is_quant_local_update:
                     if A_args.is_ues_global_res:
-                        if clients_model[worker_id].TrainRound >= global_res_round:
+                        if clients_model[worker_id].LocalModelTrainRounds >= current_cluster.GlobalResRound:
                             res_dict = clients_model[worker_id].LocalResDictUpdate
                         else:
                             if current_cluster.get_avg_cluster_res_copy() is not None:
-                                down_res_counts += 1
                                 res_dict = current_cluster.get_avg_cluster_res_copy()
                                 if A_args.is_add_global_res_to_model:
                                     train_model_dict = model_add(train_model_dict, res_dict)
@@ -271,6 +272,9 @@ def main(Config_name, Data_name):
                 local_model = model_add(train_model_dict, train_info['model_update'])
 
             clients_model[worker_id].set_client_info(local_model, train_info['data_len'], train_info['res_model_update'])
+            clients_model[worker_id].LocalModelTrainRounds = global_train_rounds + 1
+            if clients_model[worker_id].LocalModelTrainRounds != 0 and clients_model[worker_id].LocalModelTrainRounds % A_args.pre_global_res_update_round == 0:
+                clients_model[worker_id].up_load_res(quant_model, A_args.is_quant_up_local_res)
 
         # global_si_ma = calculate_similarity(clients_model, global_model, cluster_clients_train, old_matrix, args)
         global_si_ma = calculate_relative_similarity(clients_model, global_model, cluster_clients_train, old_matrix, args)
@@ -302,18 +306,6 @@ def main(Config_name, Data_name):
 
         # ClusterManager.UpdateClusterAvgModel(clients_model, cluster_clients_train)
         t1 = time.time()
-
-        if A_args.is_quant_local_update and A_args.is_ues_global_res:
-            if epoch % A_args.pre_global_res_update_round == 0 and epoch != 0:
-                global_res_round = epoch
-                # 更新本地 残差上传到服务端 的 记录
-                for worker_id in cluster_clients_train:
-                    clients_model[worker_id].LocalToGlobalResRound = global_res_round
-                    if clients_model[worker_id].LocalResDictUpdate is not None and A_args.is_quant_up_local_res:
-                        quant_res = quant_model(clients_model[worker_id].LocalResDictUpdate, args)
-                        clients_model[worker_id].LocalToGlobalResDictUpdate = quant_res
-                    else:
-                        clients_model[worker_id].update_global_res()
 
         # 更新本地 上传到服务端的 残差记录
         ClusterManager.UpdateClusterAvgModelAndResWithTime(clients_model, A_args.is_ues_global_res)
@@ -362,6 +354,11 @@ def main(Config_name, Data_name):
             current_max_acc = TotalAcc[epoch]
         print("Epoch------------------------------------: {}\t, HCCFL\t: Acc : {}\t, Max_Acc : {}\t".format(epoch, TotalAcc[epoch], current_max_acc))
 
+    # 统计上传残差次数
+    sum_up_counts = 0
+    for Client in clients_model.values():
+        sum_up_counts += Client.up_res_times
+
     save_dict = args.save_dict()
     save_dict['algorithm_name'] = args_set.get_Description()  # 'HCCFL_res_spare_0.3_res_5_no_deep'
     save_dict['acc'] = max(TotalAcc)
@@ -372,7 +369,7 @@ def main(Config_name, Data_name):
     save_dict['final_cluster_number'] = FinalClusterNumber
     save_dict['sim_std'] = SimSTD
     save_dict['sim_mean'] = SimMean
-    save_dict['DownResCounts'] = down_res_counts
+    save_dict['UpResCounts'] = sum_up_counts
     save_dict['Config_name'] = Data_name + "_"+ Config_name
 
     FileProcess.add_row(save_dict)
