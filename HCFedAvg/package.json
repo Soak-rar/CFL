@@ -68,7 +68,7 @@
 
   "Data_1": {
     "ClusterTree": {
-      "H": 0.11
+      "H": 0.06
     },
     "lr": 0.0005,
     "global_round": 300,
