@@ -111,16 +111,6 @@ class KMeansArgs:
         self.local_epoch = 5
 
 
-class LocalModelList:
-    def __init__(self):
-        self.ModelDictList: OrderedDict = OrderedDict()
-
-    def add_model_dict(self, model_dict, round):
-        if len(self.ModelDictList.keys()) == 22:
-            self.ModelDictList.popitem(last=False)
-        self.ModelDictList[round] = model_dict
-
-
 class ClientInServerData:
     def __init__(self, ID: int, ModelDict, inClusterID, Round):
         self.ClientID: int = ID
@@ -136,16 +126,26 @@ class ClientInServerData:
         # 描述当前客户端最新的参与训练的轮次
         self.TrainRound = Round
         self.NumRounds = 0
-        # 记录客户端的历史训练的本地模型更新模型
-        self.LocalModelUpdateList: LocalModelList = LocalModelList()
+
+        # 记录全局模型经过本地训练后的总轮次，一般在本地训练后 +1
+        self.LocalModelTrainRounds = 0
+        # 本地当前的残差是否上传过服务端， 如果上传过，为True，服务端会存在一个副本，同时再使用时，将不记录通信量消耗中
+        self.up_res_times = 0
+
+    def up_load_res(self, func = None, is_quant_up_res = False, args = None):
+        self.LocalToGlobalResRound = self.LocalModelTrainRounds
+        self.up_res_times += 1
+
+        if is_quant_up_res:
+            quant_res = func(copy.deepcopy(self.LocalResDictUpdate), args)
+            self.LocalToGlobalResDictUpdate = quant_res
+        else:
+            self.LocalToGlobalResDictUpdate = copy.deepcopy(self.LocalResDictUpdate)
 
     def set_client_info(self, ModelDict, DataSize, local_res_dict):
         self.ModelStaticDict = copy.deepcopy(ModelDict)
         self.DataLen = DataSize
         self.LocalResDictUpdate = local_res_dict
-
-    def add_model_update(self, mode_dict, t_round):
-        self.LocalModelUpdateList.add_model_dict(mode_dict, t_round)
 
 
     def set_client_InClusterID(self, ClusterID):

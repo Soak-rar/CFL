@@ -17,6 +17,10 @@ class HCCluster:
         self.set_max_in_cluster_distance(similarity_matrix)
         self.AvgClusterModelDict = None
         self.ClusterResDictUpdate = None
+        # 集群模型经过了多少次本地训练，即由本地模型的 TrainRound决定
+        self.ClusterModelTrainRounds = 0
+        self.ClusterResRounds = 0
+
         self.CurrentModelRound = 0
         self.GlobalResRound = 0
 
@@ -28,6 +32,35 @@ class HCCluster:
         return copy.deepcopy(self.ClusterResDictUpdate)
 
     def set_cluster_res_update(self, clients_model: Dict[int, ClientInServerData], train_clients):
+        if len(train_clients) == 0:
+            return
+        # 找到 最新的 全局残差，并进行聚合
+
+        max_res_round = 0
+        max_res_clients = []
+
+        total_len = 0
+        if len(train_clients) > 1:
+            for client_id in train_clients:
+                total_len += clients_model[client_id].DataLen
+                if clients_model[client_id].LocalToGlobalResRound > 0:
+                    if clients_model[client_id].LocalToGlobalResRound > max_res_round:
+                        max_res_clients.clear()
+                        max_res_clients.append(client_id)
+                        max_res_round = clients_model[client_id].LocalToGlobalResRound
+                    elif clients_model[client_id].LocalToGlobalResRound == max_res_round:
+                        max_res_clients.append(client_id)
+            self.GlobalResRound = max_res_round
+
+            if len(max_res_clients) > 0:
+                self.ClusterResDictUpdate = copy.deepcopy(clients_model[train_clients[0]].ModelStaticDict)
+                for key in self.ClusterResDictUpdate.keys():
+                    self.ClusterResDictUpdate[key] *= 0
+                    for client_id in max_res_clients:
+                        self.ClusterResDictUpdate[key] += (clients_model[client_id].LocalToGlobalResDictUpdate[key] * clients_model[
+                            client_id].DataLen / total_len)
+
+    def set_cluster_res_update_2dot0(self, clients_model: Dict[int, ClientInServerData], train_clients):
         if len(train_clients) == 0:
             return
         self.ClusterResDictUpdate = copy.deepcopy(clients_model[train_clients[0]].ModelStaticDict)
@@ -101,22 +134,6 @@ class HCCluster:
 
     def set_avg_cluster_model_with_time(self, clients_model: Dict[int, ClientInServerData], train_clients):
 
-        # self.AvgClusterModelDict = copy.deepcopy(clients_model[self.Clients[0]].ModelStaticDict)
-        # MaxRound = 0
-        # e_sum = 0.0
-        # for client_id in train_clients:
-        #     client_round = clients_model[client_id].TrainRound
-        #     e_sum += math.exp(client_round)
-        #     if clients_model[client_id].TrainRound > MaxRound:
-        #         MaxRound = clients_model[client_id].TrainRound
-        #
-        # self.CurrentModelRound = MaxRound
-        #
-        # for key in self.AvgClusterModelDict.keys():
-        #     self.AvgClusterModelDict[key] *= 0
-        #     for client_id in train_clients:
-        #         self.AvgClusterModelDict[key] += (clients_model[client_id].ModelStaticDict[key]) * (math.exp(clients_model[client_id].TrainRound)) / e_sum
-
         self.AvgClusterModelDict = copy.deepcopy(clients_model[self.Clients[0]].ModelStaticDict)
         MaxRound = 0
         e_sum = 0.0
@@ -133,6 +150,31 @@ class HCCluster:
             self.AvgClusterModelDict[key] *= 0
             for client_id in train_clients:
                 self.AvgClusterModelDict[key] += (clients_model[client_id].ModelStaticDict[key]) *  clients_model[client_id].DataLen / total_len
+
+    def set_avg_cluster_model_with_time_LocalModelTrainRounds(self, clients_model: Dict[int, ClientInServerData], train_clients):
+
+        self.AvgClusterModelDict = copy.deepcopy(clients_model[self.Clients[0]].ModelStaticDict)
+        MaxRound = 0
+        e_sum = 0.0
+        total_len = 0
+        for client_id in train_clients:
+            total_len += clients_model[client_id].DataLen
+            if clients_model[client_id].LocalModelTrainRounds > MaxRound:
+                MaxRound = clients_model[client_id].LocalModelTrainRounds
+
+        self.ClusterModelTrainRounds = MaxRound
+
+        for key in self.AvgClusterModelDict.keys():
+            self.AvgClusterModelDict[key] *= 0
+            for client_id in train_clients:
+                self.AvgClusterModelDict[key] += (clients_model[client_id].ModelStaticDict[key]) *  clients_model[client_id].DataLen / total_len
+
+    # 获取本地残差，进行全局残差同步
+    def get_upload_local_res_and_avg_global_res(self, clients_model: Dict[int, ClientInServerData], train_clients, global_train_rounds, global_f):
+        if global_train_rounds != 0 and global_train_rounds % global_f == 0:
+            for client_id in train_clients:
+                if not clients_model[client_id].is_uploaded_local_res:
+                    clients_model[client_id].up_load_res()
 
     def set_max_in_cluster_distance(self, similarity_matrix: Dict[int, Dict[int, float]]):
         for client_id_l in self.Clients:
@@ -238,13 +280,15 @@ class HCClusterManager:
             train_clients = self.get_last_train_clients(clients_model, Cluster.Clients)
             Cluster.set_avg_cluster_model(clients_model, train_clients)
 
+
+
     # 设置集群模型 ，如果全局轮次满足条件设置集群残差
     def UpdateClusterAvgModelAndResWithTime(self, clients_model: Dict[int, ClientInServerData], use_quant = True):
         for cluster_id, Cluster in self.CurrentClusters.items():
             for client_id in Cluster.Clients:
                 clients_model[client_id].set_client_InClusterID(cluster_id)
-            train_clients = self.get_last_train_clients(clients_model, Cluster.Clients)
-            Cluster.set_avg_cluster_model_with_time(clients_model,train_clients)
+            train_clients = self.get_last_train_clients_by_local_model_train_rounds(clients_model, Cluster.Clients)
+            Cluster.set_avg_cluster_model_with_time_LocalModelTrainRounds(clients_model,train_clients)
             if use_quant:
                 Cluster.set_cluster_res_update(clients_model, Cluster.Clients)
 
@@ -257,6 +301,18 @@ class HCClusterManager:
                 train_clients.append(client_id)
                 max_round = clients_model[client_id].TrainRound
             elif clients_model[client_id].TrainRound == max_round:
+                train_clients.append(client_id)
+        return train_clients
+
+    def get_last_train_clients_by_local_model_train_rounds(self, clients_model: Dict[int, ClientInServerData], Clients:[int]):
+        max_round = 0
+        train_clients = []
+        for client_id in Clients:
+            if clients_model[client_id].LocalModelTrainRounds > max_round:
+                train_clients.clear()
+                train_clients.append(client_id)
+                max_round = clients_model[client_id].LocalModelTrainRounds
+            elif clients_model[client_id].LocalModelTrainRounds == max_round:
                 train_clients.append(client_id)
         return train_clients
 

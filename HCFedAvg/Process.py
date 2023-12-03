@@ -11,7 +11,7 @@ class Process:
 
 if __name__ == '__main__':
     Config_name = "Config_1"
-    Data_name = "Data_7"
+    Data_name = "Data_4"
     p = Process(Config_name, Data_name)
     print(Config_name)
     print(Data_name)
