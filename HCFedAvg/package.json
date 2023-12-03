@@ -65,6 +65,26 @@
     }
   },
 
+      "Config_4": {
+    "Description": "FACL_RES_NoZeroSTC_上传本地残差的bit量化，将全局残差和全局模型累加下载到本地",
+    "AlgorithmParams": {
+      "random_seed": 2,
+      "is_quant_local_update": true,
+
+      "is_quant_up_local_res": true,
+      "is_quant_down_global_res": false,
+
+      "is_quant_down_update": false,
+
+      "is_ues_global_res": true,
+      "is_add_global_res_to_model": true,
+
+      "spare_rate": 0.1,
+      "pre_global_res_update_round": 10,
+      "quanter_name": "NoZeroSTCQuanter"
+    }
+  },
+
 
   "Data_1": {
     "ClusterTree": {
