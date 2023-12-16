@@ -2,6 +2,10 @@
 import pandas as pd
 
 import ast
+
+import Args
+
+
 # 实验结果csv文件处理
 
 def add_row(result_dict):
@@ -72,12 +76,12 @@ def read_row_with_file_name(row_id, filename):
 if __name__ == '__main__':
 
     # create_file("")
-    # add_new_column("Config_name")
+    # add_new_column("down_res_counts_list")
     # add_new_column_with_file("L2", "TAS_result")
 
     # add_new_column('sim_std')
     # args = Args.Arguments()
-    # res_1 = read_row(48)
+    # res_1 = read_row(78)
     # # 将字符串转换为Python列表
     # float_list = ast.literal_eval(res_1['acc_list'])
     #

@@ -289,7 +289,7 @@ class HCClusterManager:
             for client_id in Cluster.Clients:
                 clients_model[client_id].set_client_InClusterID(cluster_id)
             train_clients = self.get_last_train_clients_by_local_model_train_rounds(clients_model, Cluster.Clients)
-            Cluster.set_avg_cluster_model_with_time_LocalModelTrainRounds(clients_model,train_clients)
+            Cluster.set_avg_cluster_model_with_time_LocalModelTrainRounds(clients_model, train_clients)
             if use_quant:
                 Cluster.set_cluster_res_update(clients_model, Cluster.Clients)
 

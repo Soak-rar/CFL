@@ -200,7 +200,8 @@ def main(Config_name, Data_name):
     global_res_round = 0
 
     # 记录下载全局残差的次数
-    down_res_counts = 0
+
+
 
     # 记录当前轮次下行 残差的次数
     down_res_list = []
@@ -217,6 +218,8 @@ def main(Config_name, Data_name):
                 clients_time[k] = 1
             else:
                 clients_time[k] += 1
+
+        down_res_counts = 0
         ###
         ## 纯随机
         # cluster_clients_train = random.sample(train_workers, args.worker_train)
@@ -247,16 +250,22 @@ def main(Config_name, Data_name):
                 # 如果 本地残差比 全局的新，用本地的， 如果全局残差为空，也用本地的
                 if A_args.is_quant_local_update:
                     if A_args.is_ues_global_res:
-                        if clients_model[worker_id].LocalModelTrainRounds >= current_cluster.ClusterResRounds:
+
+                        if clients_model[worker_id].LocalModelTrainRounds >= current_cluster.GlobalResRound:
                             res_dict = clients_model[worker_id].LocalResDictUpdate
                         else:
                             if current_cluster.get_avg_cluster_res_copy() is not None:
                                 res_dict = current_cluster.get_avg_cluster_res_copy()
+                                down_res_counts += 1
+                                if A_args.is_quant_down_global_res:
+                                    res_dict = quant_model(res_dict, args)
                                 if A_args.is_add_global_res_to_model:
                                     train_model_dict = model_add(train_model_dict, res_dict)
                                     res_dict = None
                             else:
                                 res_dict = clients_model[worker_id].LocalResDictUpdate
+
+
                     else:
                         res_dict = clients_model[worker_id].LocalResDictUpdate
 
@@ -274,7 +283,7 @@ def main(Config_name, Data_name):
             clients_model[worker_id].set_client_info(local_model, train_info['data_len'], train_info['res_model_update'])
             clients_model[worker_id].LocalModelTrainRounds = global_train_rounds + 1
             if clients_model[worker_id].LocalModelTrainRounds != 0 and clients_model[worker_id].LocalModelTrainRounds % A_args.pre_global_res_update_round == 0:
-                clients_model[worker_id].up_load_res(quant_model, A_args.is_quant_up_local_res)
+                clients_model[worker_id].up_load_res(quant_model, A_args.is_quant_up_local_res, args)
 
         # global_si_ma = calculate_similarity(clients_model, global_model, cluster_clients_train, old_matrix, args)
         global_si_ma = calculate_relative_similarity(clients_model, global_model, cluster_clients_train, old_matrix, args)
@@ -371,6 +380,9 @@ def main(Config_name, Data_name):
     save_dict['sim_mean'] = SimMean
     save_dict['UpResCounts'] = sum_up_counts
     save_dict['Config_name'] = Data_name + "_"+ Config_name
+    if not A_args.is_add_global_res_to_model:
+        save_dict['down_res_counts_list'] = down_res_list
+        save_dict['down_res_counts'] = np.sum(down_res_list)
 
     FileProcess.add_row(save_dict)
 

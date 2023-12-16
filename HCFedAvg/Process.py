@@ -10,7 +10,7 @@ class Process:
             arg(self.Config_name, self.Data_name)
 
 if __name__ == '__main__':
-    Config_name = "Config_1"
+    Config_name = "Config_9"
     Data_name = "Data_4"
     p = Process(Config_name, Data_name)
     print(Config_name)

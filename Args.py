@@ -175,7 +175,7 @@ class AlgorithmParams:
         self.is_add_global_res_to_model= True
 
         self.spare_rate= 0.1
-        self.pre_global_res_update_round= 10
+        self.pre_global_res_update_round = 10
 
         self.quanter_name = "STCQuanter"
 
