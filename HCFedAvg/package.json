@@ -20,7 +20,8 @@
 
       "spare_rate": 0.1,
       "pre_global_res_update_round": 10,
-      "quanter_name": "STCQuanter"
+      "quanter_name": "STCQuanter",
+      "bit_quant_number": 8
     }
   },
 
@@ -41,12 +42,13 @@
 
       "spare_rate": 0.1,
       "pre_global_res_update_round": 10,
-      "quanter_name": "STCQuanter"
+      "quanter_name": "STCQuanter",
+      "bit_quant_number": 8
     }
   },
 
     "Config_3": {
-    "Description": "FACL_MEMSGD",
+    "Description": "FL_LSGD_DB",
     "AlgorithmParams": {
       "random_seed": 2,
       "is_quant_local_update": true,
@@ -61,7 +63,8 @@
 
       "spare_rate": 0.1,
       "pre_global_res_update_round": 10,
-      "quanter_name": "SpareQuanter"
+      "quanter_name": "SpareQuanter",
+      "bit_quant_number": 8
     }
   },
 
@@ -81,7 +84,8 @@
 
       "spare_rate": 0.1,
       "pre_global_res_update_round": 10,
-      "quanter_name": "NoZeroSTCQuanter"
+      "quanter_name": "NoZeroSTCQuanter",
+      "bit_quant_number": 8
     }
   },
 
@@ -101,7 +105,8 @@
 
       "spare_rate": 0.1,
       "pre_global_res_update_round": 10,
-      "quanter_name": "STCQuanter"
+      "quanter_name": "STCQuanter",
+      "bit_quant_number": 8
     }
   },
 
@@ -121,7 +126,8 @@
 
       "spare_rate": 0.1,
       "pre_global_res_update_round": 10,
-      "quanter_name": "NoZeroSTCQuanter"
+      "quanter_name": "NoZeroSTCQuanter",
+      "bit_quant_number": 8
     }
   },
 
@@ -142,7 +148,8 @@
 
       "spare_rate": 0.1,
       "pre_global_res_update_round": 10,
-      "quanter_name": "STCQuanter"
+      "quanter_name": "STCQuanter",
+      "bit_quant_number": 8
     }
   },
 
@@ -163,12 +170,13 @@
 
       "spare_rate": 0.1,
       "pre_global_res_update_round": 10,
-      "quanter_name": "STCQuanter"
+      "quanter_name": "STCQuanter",
+      "bit_quant_number": 8
     }
   },
 
     "Config_9": {
-    "Description": "FACL_RES_上传本地残差，将全局模型下载到本地,全局残差使用bit量化下载到本地",
+    "Description": "FACL_SQ_GRES_上传本地残差，将全局模型下载到本地,全局残差使用bit量化下载到本地",
     "AlgorithmParams": {
       "random_seed": 2,
       "is_quant_local_update": true,
@@ -183,13 +191,134 @@
 
       "spare_rate": 0.1,
       "pre_global_res_update_round": 10,
-      "quanter_name": "STCQuanter"
+      "quanter_name": "STCQuanter",
+      "bit_quant_number": 8
+    }
+  },
+
+      "Config_10": {
+    "Description": "FACL_RES_上传本地残差(不量化)，将全局残差和全局模型累加下载到本地",
+    "AlgorithmParams": {
+      "random_seed": 2,
+      "is_quant_local_update": true,
+
+      "is_quant_up_local_res": false,
+      "is_quant_down_global_res": false,
+
+      "is_quant_down_update": false,
+
+      "is_ues_global_res": true,
+      "is_add_global_res_to_model": true,
+
+      "spare_rate": 0.1,
+      "pre_global_res_update_round": 5,
+      "quanter_name": "STCQuanter",
+      "bit_quant_number": 8
+    }
+  },
+
+    "Config_11": {
+    "Description": "FACL_RES_上传本地残差的bit量化，将全局残差和全局模型累加下载到本地",
+    "AlgorithmParams": {
+      "random_seed": 2,
+      "is_quant_local_update": true,
+
+      "is_quant_up_local_res": true,
+      "is_quant_down_global_res": false,
+
+      "is_quant_down_update": false,
+
+      "is_ues_global_res": true,
+      "is_add_global_res_to_model": true,
+
+      "spare_rate": 0.1,
+      "pre_global_res_update_round": 5,
+      "quanter_name": "STCQuanter",
+      "bit_quant_number": 8
+    }
+  },
+      "Config_12": {
+    "Description": "FACL_RES_上传本地残差的bit量化，将全局残差和全局模型累加下载到本地",
+    "AlgorithmParams": {
+      "random_seed": 2,
+      "is_quant_local_update": true,
+
+      "is_quant_up_local_res": true,
+      "is_quant_down_global_res": false,
+
+      "is_quant_down_update": false,
+
+      "is_ues_global_res": true,
+      "is_add_global_res_to_model": true,
+
+      "spare_rate": 0.1,
+      "pre_global_res_update_round": 10,
+      "quanter_name": "STCQuanter",
+      "bit_quant_number": 8
+    }
+  },
+
+      "Config_13": {
+        "Description": "FACL_RES_上传本地残差的bit量化，将全局残差和全局模型累加下载到本地",
+        "AlgorithmParams": {
+          "random_seed": 2,
+          "is_quant_local_update": true,
+          "is_quant_up_local_res": true,
+          "is_quant_down_global_res": false,
+          "is_quant_down_update": false,
+          "is_ues_global_res": true,
+          "is_add_global_res_to_model": true,
+          "spare_rate": 0.1,
+          "pre_global_res_update_round": 15,
+          "quanter_name": "STCQuanter",
+          "bit_quant_number": 8
+        }
+      },
+
+          "Config_14": {
+    "Description": "FACL_RES_上传本地残差的bit量化，将全局残差和全局模型累加下载到本地",
+    "AlgorithmParams": {
+      "random_seed": 2,
+      "is_quant_local_update": true,
+
+      "is_quant_up_local_res": true,
+      "is_quant_down_global_res": false,
+
+      "is_quant_down_update": false,
+
+      "is_ues_global_res": true,
+      "is_add_global_res_to_model": true,
+
+      "spare_rate": 0.1,
+      "pre_global_res_update_round": 5,
+      "quanter_name": "STCQuanter",
+      "bit_quant_number": 4
+    }
+  },
+  "Config_15": {
+    "Description": "FACL_RES_上传本地残差的bit量化，将全局残差和全局模型累加下载到本地",
+    "AlgorithmParams": {
+      "random_seed": 2,
+      "is_quant_local_update": true,
+
+      "is_quant_up_local_res": true,
+      "is_quant_down_global_res": false,
+
+      "is_quant_down_update": false,
+
+      "is_ues_global_res": true,
+      "is_add_global_res_to_model": true,
+
+      "spare_rate": 0.1,
+      "pre_global_res_update_round": 5,
+      "quanter_name": "STCQuanter",
+      "bit_quant_number": 2
     }
   },
 
   "Data_1": {
     "ClusterTree": {
-      "H": 0.06
+      "H": 0.04
     },
     "lr": 0.0005,
     "global_round": 300,
@@ -200,13 +329,14 @@
       "data_rot": [],
       "divide_type": "labels"
     },
-    "cuda": true
+    "cuda": true,
+    "data_type_name": "Overlapping"
   },
 
 
   "Data_2": {
     "ClusterTree": {
-      "H": 0.11
+      "H": 0.038
     },
     "lr": 0.0005,
     "global_round": 300,
@@ -217,11 +347,12 @@
       "data_rot": [],
       "divide_type": "labels"
     },
-    "cuda": true
+    "cuda": true,
+    "data_type_name": "Cover"
   },
    "Data_3": {
      "ClusterTree": {
-      "H": 0.11
+      "H": 0.04
     },
     "lr": 0.0005,
     "global_round": 300,
@@ -232,7 +363,8 @@
       "data_rot": [],
       "divide_type": "labels"
     },
-    "cuda": true
+    "cuda": true,
+     "data_type_name": "Parallel"
   },
     "Data_4": {
       "ClusterTree": {
@@ -247,12 +379,13 @@
       "data_rot": [],
       "divide_type": "labels"
     },
-    "cuda": true
+    "cuda": true,
+       "data_type_name": "Overlapping"
   },
 
   "Data_5": {
     "ClusterTree": {
-      "H": 0.11
+      "H": 0.105
     },
     "lr": 0.0005,
     "global_round": 300,
@@ -263,7 +396,8 @@
       "data_rot": [],
       "divide_type": "labels"
     },
-    "cuda": true
+    "cuda": true,
+    "data_type_name": "Cover"
   },
    "Data_6": {
      "ClusterTree": {
@@ -278,7 +412,8 @@
       "data_rot": [],
       "divide_type": "labels"
     },
-    "cuda": true
+    "cuda": true,
+      "data_type_name": "Parallel"
   },
 
   "Data_7": {

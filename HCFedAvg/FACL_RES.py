@@ -153,6 +153,7 @@ def quant_model(model_dict, args: Args.Arguments):
     model.load_state_dict(model_dict)
 
     quanter = Model.BitQuanter()
+    quanter.set_compression_bits(args.bit_quant_number)
     model.set_quanter(quanter)
     model.quant()
     return copy.deepcopy(model.dequant())
@@ -163,6 +164,7 @@ def main(Config_name, Data_name):
     A_args = Args.AlgorithmParams()
     ClusterManager = HCClusterTree.HCClusterManager()
     args_set.set_all_args(args,ClusterManager, A_args)
+    args.bit_quant_number = A_args.bit_quant_number
 
     datasetGen = DatasetGen(args)
 
@@ -201,7 +203,7 @@ def main(Config_name, Data_name):
 
     # 记录下载全局残差的次数
 
-
+    up_res_counts_list = []
 
     # 记录当前轮次下行 残差的次数
     down_res_list = []
@@ -257,6 +259,7 @@ def main(Config_name, Data_name):
                             if current_cluster.get_avg_cluster_res_copy() is not None:
                                 res_dict = current_cluster.get_avg_cluster_res_copy()
                                 down_res_counts += 1
+                                print("Use global")
                                 if A_args.is_quant_down_global_res:
                                     res_dict = quant_model(res_dict, args)
                                 if A_args.is_add_global_res_to_model:
@@ -282,7 +285,7 @@ def main(Config_name, Data_name):
 
             clients_model[worker_id].set_client_info(local_model, train_info['data_len'], train_info['res_model_update'])
             clients_model[worker_id].LocalModelTrainRounds = global_train_rounds + 1
-            if clients_model[worker_id].LocalModelTrainRounds != 0 and clients_model[worker_id].LocalModelTrainRounds % A_args.pre_global_res_update_round == 0:
+            if clients_model[worker_id].LocalModelTrainRounds != 0 and clients_model[worker_id].LocalModelTrainRounds % A_args.pre_global_res_update_round == 0 and A_args.is_ues_global_res:
                 clients_model[worker_id].up_load_res(quant_model, A_args.is_quant_up_local_res, args)
 
         # global_si_ma = calculate_similarity(clients_model, global_model, cluster_clients_train, old_matrix, args)
@@ -338,8 +341,13 @@ def main(Config_name, Data_name):
                 top_acc[int(cluster_id % args.cluster_number)] = acc
 
 
-
+        print(down_res_counts)
         down_res_list.append(down_res_counts)
+
+        sum_up_counts = 0
+        for Client in clients_model.values():
+            sum_up_counts += Client.up_res_times
+        up_res_counts_list.append(sum_up_counts)
 
         # 输出当前轮次集群结果
 
@@ -364,9 +372,7 @@ def main(Config_name, Data_name):
         print("Epoch------------------------------------: {}\t, HCCFL\t: Acc : {}\t, Max_Acc : {}\t".format(epoch, TotalAcc[epoch], current_max_acc))
 
     # 统计上传残差次数
-    sum_up_counts = 0
-    for Client in clients_model.values():
-        sum_up_counts += Client.up_res_times
+
 
     save_dict = args.save_dict()
     save_dict['algorithm_name'] = args_set.get_Description()  # 'HCCFL_res_spare_0.3_res_5_no_deep'
@@ -378,11 +384,13 @@ def main(Config_name, Data_name):
     save_dict['final_cluster_number'] = FinalClusterNumber
     save_dict['sim_std'] = SimSTD
     save_dict['sim_mean'] = SimMean
-    save_dict['UpResCounts'] = sum_up_counts
-    save_dict['Config_name'] = Data_name + "_"+ Config_name
+    save_dict['UpResCounts'] = up_res_counts_list
+    save_dict['Config_name'] = Data_name + "_" + Config_name
+    save_dict['data_type_name'] = args.data_type_name
     if not A_args.is_add_global_res_to_model:
         save_dict['down_res_counts_list'] = down_res_list
         save_dict['down_res_counts'] = np.sum(down_res_list)
+
 
     FileProcess.add_row(save_dict)
 

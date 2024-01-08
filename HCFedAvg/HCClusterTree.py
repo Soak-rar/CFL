@@ -19,7 +19,7 @@ class HCCluster:
         self.ClusterResDictUpdate = None
         # 集群模型经过了多少次本地训练，即由本地模型的 TrainRound决定
         self.ClusterModelTrainRounds = 0
-        self.ClusterResRounds = 0
+        self.GlobalResRound = 0
 
         self.CurrentModelRound = 0
 

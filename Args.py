@@ -46,6 +46,10 @@ class Arguments:
                           'divide_type': 'labels'
                           }# 'rot'
 
+        self.data_type_name = "Overlapping"
+
+        self.bit_quant_number = 8
+
         self.cluster_number = len(self.data_info["data_labels"]) if self.data_info["divide_type"]=="labels" else len(self.data_info["data_rot"])
         self.cuda = True
         self.save_path = ""
@@ -179,6 +183,8 @@ class AlgorithmParams:
 
         self.quanter_name = "STCQuanter"
 
+        self.bit_quant_number = 8
+
 class ArgsSet:
     def __init__(self, config_name, data_name):
         self.DataJsonObject = None
@@ -216,6 +222,7 @@ class ArgsSet:
         args.data_info["data_labels"] = Argument_args["data_info"]["data_labels"]
         args.data_info["data_rot"] = Argument_args["data_info"]["data_rot"]
         args.data_info["divide_type"] = Argument_args["data_info"]["divide_type"]
+        args.data_type_name = Argument_args["data_type_name"]
 
         args.cluster_number = len(args.data_info["data_labels"]) if args.data_info["divide_type"] == "labels" else len(
             args.data_info["data_rot"])
@@ -241,3 +248,4 @@ class ArgsSet:
         algorithm_.pre_global_res_update_round = Argument_args['pre_global_res_update_round']
 
         algorithm_.quanter_name = Argument_args['quanter_name']
+        algorithm_.bit_quant_number = Argument_args['bit_quant_number']
